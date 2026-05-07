@@ -27,3 +27,13 @@ export const uploadDocument = (
 
 export const deleteDocument = (id: number) =>
   client.delete(`/documents/${id}`);
+
+export const downloadDocument = async (id: number, fileName: string) => {
+  const response = await client.get(`/documents/${id}/download`, { responseType: 'blob' });
+  const url = URL.createObjectURL(response.data as Blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  a.click();
+  URL.revokeObjectURL(url);
+};

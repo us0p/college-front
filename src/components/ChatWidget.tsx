@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { sendMessage } from '../api/chat';
+import { downloadDocument } from '../api/documents';
 import type { ChatMessage } from '../types';
 
 export default function ChatWidget() {
@@ -73,9 +74,13 @@ export default function ChatWidget() {
                   {msg.sources && msg.sources.length > 0 && (
                     <div className="mt-1.5 pt-1.5 border-t border-gray-200 space-y-0.5">
                       {msg.sources.map((s, j) => (
-                        <div key={j} className="text-xs text-gray-400">
+                        <button
+                          key={j}
+                          onClick={() => downloadDocument(s.documentId, s.fileName)}
+                          className="block text-xs text-indigo-500 hover:text-indigo-700 hover:underline text-left"
+                        >
                           📎 {s.fileName}
-                        </div>
+                        </button>
                       ))}
                     </div>
                   )}

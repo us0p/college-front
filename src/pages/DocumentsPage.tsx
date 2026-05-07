@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getDocuments, uploadDocument, deleteDocument } from '../api/documents';
+import { getDocuments, uploadDocument, deleteDocument, downloadDocument } from '../api/documents';
 import type { DocumentResponse } from '../types';
 import Spinner from '../components/Spinner';
 import Modal from '../components/Modal';
@@ -40,14 +40,12 @@ function DocumentCard({
         </div>
       </div>
       <div className="flex flex-col gap-1 shrink-0">
-        <a
-          href={doc.bucketUrl}
-          target="_blank"
-          rel="noreferrer"
+        <button
+          onClick={() => downloadDocument(doc.id, doc.fileName)}
           className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
         >
-          View
-        </a>
+          Download
+        </button>
         <button
           onClick={() => onDelete(doc.id)}
           className="text-xs text-red-500 hover:text-red-700 font-medium"
