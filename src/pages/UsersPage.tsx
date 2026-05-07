@@ -13,7 +13,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 
 const userSchema = z.object({
   username: z.string().min(1).max(20),
-  email: z.string().email(),
+  email: z.string().email().max(254),
   password: z.string().min(8).max(72),
   roleId: z.string().min(1, 'Select a role'),
   ra: z.string().max(10).optional(),
@@ -161,7 +161,12 @@ export default function UsersPage() {
 
   const createMutation = useMutation({
     mutationFn: (data: UserFormData) =>
-      createUser({ ...data, roleId: Number(data.roleId) }),
+      createUser({
+        ...data,
+        roleId: Number(data.roleId),
+        ra: data.ra || undefined,
+        phoneNumber: data.phoneNumber || undefined,
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['users'] });
       setShowCreate(false);
@@ -170,7 +175,12 @@ export default function UsersPage() {
 
   const updateMutation = useMutation({
     mutationFn: (data: UserFormData) =>
-      updateUser(editing!.id, { ...data, roleId: Number(data.roleId) }),
+      updateUser(editing!.id, {
+        ...data,
+        roleId: Number(data.roleId),
+        ra: data.ra || undefined,
+        phoneNumber: data.phoneNumber || undefined,
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['users'] });
       setEditing(null);

@@ -32,6 +32,11 @@ function DocumentCard({
           <span className="text-xs text-gray-400">@{doc.username}</span>
           <span className="text-xs text-gray-300">•</span>
           <span className="text-xs text-gray-400">{formatBytes(doc.fileSize)}</span>
+          {doc.knowledgeBase && (
+            <span className="text-xs bg-indigo-100 text-indigo-700 font-medium px-1.5 py-0.5 rounded">
+              Knowledge Base
+            </span>
+          )}
         </div>
       </div>
       <div className="flex flex-col gap-1 shrink-0">
@@ -61,13 +66,14 @@ function UploadForm({
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [description, setDescription] = useState('');
+  const [knowledgeBase, setKnowledgeBase] = useState(false);
   const userId = 1; // TODO: derive from token
 
   const mutation = useMutation({
     mutationFn: () => {
       const file = fileRef.current?.files?.[0];
       if (!file) throw new Error('No file selected');
-      return uploadDocument(userId, file, description || undefined);
+      return uploadDocument(userId, file, description || undefined, knowledgeBase);
     },
     onSuccess,
   });
@@ -93,6 +99,18 @@ function UploadForm({
           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
           placeholder="Brief description of the document..."
         />
+      </div>
+      <div className="flex items-center gap-2">
+        <input
+          id="knowledgeBase"
+          type="checkbox"
+          checked={knowledgeBase}
+          onChange={(e) => setKnowledgeBase(e.target.checked)}
+          className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+        />
+        <label htmlFor="knowledgeBase" className="text-sm font-medium text-gray-700">
+          Add to Knowledge Base
+        </label>
       </div>
       {mutation.isError && <ErrorMessage message="Upload failed. Please try again." />}
       <button

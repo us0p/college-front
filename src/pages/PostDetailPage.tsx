@@ -121,6 +121,18 @@ export default function PostDetailPage() {
 
       {post && (
         <>
+          {post.deletedAt && (
+            <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+              This post was deleted on{' '}
+              {new Date(post.deletedAt).toLocaleDateString(undefined, {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+              })}
+              .
+            </div>
+          )}
+
           <div className="mb-4">
             <h1 className="text-2xl font-bold text-gray-900 leading-snug mb-2">
               {post.title}
@@ -136,27 +148,29 @@ export default function PostDetailPage() {
                     day: 'numeric',
                   })}
                 </span>
-                {post.updatedAt !== post.createdAt && (
+                {new Date(post.updatedAt).getTime() !== new Date(post.createdAt).getTime() && (
                   <>
                     <span>·</span>
                     <span>edited {new Date(post.updatedAt).toLocaleDateString()}</span>
                   </>
                 )}
               </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setEditing(true)}
-                  className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => setShowDeleteConfirm(true)}
-                  className="text-sm text-red-500 hover:text-red-700 font-medium"
-                >
-                  Delete
-                </button>
-              </div>
+              {!post.deletedAt && (
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setEditing(true)}
+                    className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="text-sm text-red-500 hover:text-red-700 font-medium"
+                  >
+                    Delete
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 

@@ -10,12 +10,14 @@ export const getDocument = (id: number) =>
 export const uploadDocument = (
   userId: number,
   file: File,
-  description?: string
+  description?: string,
+  knowledgeBase?: boolean
 ) => {
   const form = new FormData();
   form.append('file', file);
   const params = new URLSearchParams({ userId: String(userId) });
   if (description) params.append('description', description);
+  if (knowledgeBase) params.append('knowledgeBase', 'true');
   return client
     .post<DocumentResponse>(`/documents?${params}`, form, {
       headers: { 'Content-Type': 'multipart/form-data' },

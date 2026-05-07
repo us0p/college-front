@@ -1,4 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import ChatWidget from './ChatWidget';
 
 const navItems = [
   { to: '/', label: 'Posts', icon: '📝' },
@@ -30,6 +31,8 @@ export default function Layout() {
       <main className="flex-1 pb-20">
         <Outlet />
       </main>
+
+      <ChatWidget />
 
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around py-2 z-10">
         {navItems.map(({ to, label, icon }) => (

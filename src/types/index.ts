@@ -83,4 +83,27 @@ export interface DocumentResponse {
   description?: string;
   fileSize: number;
   bucketUrl: string;
+  knowledgeBase: boolean;
+}
+
+export interface SourceChunk {
+  documentId: number;
+  fileName: string;
+  chunkIndex: number;
+}
+
+export interface ChatRequest {
+  question: string;
+  contextChunks?: number;
+}
+
+export interface ChatResponse {
+  answer: string;
+  sources: SourceChunk[];
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  sources?: SourceChunk[];
 }
