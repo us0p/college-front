@@ -1,0 +1,106 @@
+import { API_URL } from '@/lib/config'
+
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+  ) {
+    super(message)
+    this.name = 'ApiError'
+  }
+}
+
+async function handleResponse<T>(response: Response): Promise<T> {
+  if (!response.ok) {
+    let message = response.statusText
+    try {
+      const body = await response.json()
+      message = body.message ?? body.error ?? message
+    } catch {
+      // keep statusText if body isn't JSON
+    }
+    throw new ApiError(response.status, message)
+  }
+  if (response.status === 204) {
+    return undefined as T
+  }
+  return response.json() as Promise<T>
+}
+
+function buildHeaders(token?: string): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  return headers
+}
+
+export interface ApiClient {
+  get<T>(path: string, token?: string): Promise<T>
+  post<T>(path: string, body: unknown, token?: string): Promise<T>
+  put<T>(path: string, body: unknown, token?: string): Promise<T>
+  delete(path: string, token?: string): Promise<void>
+  postFormData<T>(
+    path: string,
+    formData: FormData,
+    params?: Record<string, string>,
+    token?: string,
+  ): Promise<T>
+}
+
+export function createApiClient(baseUrl: string): ApiClient {
+  function buildUrl(path: string, params?: Record<string, string>): string {
+    const url = new URL(path, baseUrl)
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
+    }
+    return url.toString()
+  }
+
+  return {
+    get<T>(path: string, token?: string): Promise<T> {
+      return fetch(buildUrl(path), {
+        method: 'GET',
+        headers: buildHeaders(token),
+      }).then(handleResponse<T>)
+    },
+
+    post<T>(path: string, body: unknown, token?: string): Promise<T> {
+      return fetch(buildUrl(path), {
+        method: 'POST',
+        headers: buildHeaders(token),
+        body: JSON.stringify(body),
+      }).then(handleResponse<T>)
+    },
+
+    put<T>(path: string, body: unknown, token?: string): Promise<T> {
+      return fetch(buildUrl(path), {
+        method: 'PUT',
+        headers: buildHeaders(token),
+        body: JSON.stringify(body),
+      }).then(handleResponse<T>)
+    },
+
+    delete(path: string, token?: string): Promise<void> {
+      return fetch(buildUrl(path), {
+        method: 'DELETE',
+        headers: buildHeaders(token),
+      }).then(handleResponse<void>)
+    },
+
+    postFormData<T>(
+      path: string,
+      formData: FormData,
+      params?: Record<string, string>,
+      token?: string,
+    ): Promise<T> {
+      const headers: Record<string, string> = {}
+      if (token) headers['Authorization'] = `Bearer ${token}`
+      return fetch(buildUrl(path, params), {
+        method: 'POST',
+        headers,
+        body: formData,
+      }).then(handleResponse<T>)
+    },
+  }
+}
+
+export const apiClient = createApiClient(API_URL)
