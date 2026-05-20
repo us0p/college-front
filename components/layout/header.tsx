@@ -1,14 +1,15 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { useState } from 'react'
-import { Menu, X, GraduationCap } from 'lucide-react'
+import { Menu, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/use-auth'
 
 const navLinks = [
   { href: '/', label: 'Início' },
-  { href: '/blog', label: 'Blog' },
+  { href: '/blog', label: 'Avisos' },
   { href: '/documentos', label: 'Documentos' },
 ]
 
@@ -21,9 +22,7 @@ export function Header() {
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
-            <GraduationCap className="h-6 w-6 text-primary-foreground" />
-          </div>
+          <Image src="/mural_uni_logo.png" alt="Mural Universitário" width={64} height={64} className="rounded-lg" />
           <span className="text-lg font-bold text-foreground">
             Mural Universitário
           </span>

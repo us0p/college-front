@@ -1,3 +1,10 @@
+export interface StatsResponse {
+  semester_event_count: number
+  job_post_count: number
+  connected_students: number
+  latest_news?: string
+}
+
 export interface LoginRequest {
   username: string
   password: string
@@ -53,16 +60,16 @@ export interface PermissionObjectResponse {
   name: string
 }
 
-export interface PostCategoryResponse {
+export interface NoticeCategoryResponse {
   id: number
   name: string
 }
 
-export interface PostCategoryRequest {
+export interface NoticeCategoryRequest {
   name: string
 }
 
-export interface PostResponse {
+export interface NoticeResponse {
   id: number
   userId: number
   username: string
@@ -76,7 +83,15 @@ export interface PostResponse {
   deletedAt?: string
 }
 
-export interface PostRequest {
+export interface NoticePageResponse {
+  content: NoticeResponse[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+}
+
+export interface NoticeRequest {
   userId: number
   title: string
   markdownContent: string
@@ -84,7 +99,7 @@ export interface PostRequest {
   coverImgUrl?: string
 }
 
-export interface PostUpdateRequest {
+export interface NoticeUpdateRequest {
   title: string
   markdownContent: string
   categoryId: number

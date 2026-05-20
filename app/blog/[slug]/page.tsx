@@ -1,8 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { useParams, notFound } from 'next/navigation'
-import Link from 'next/link'
+import { useParams, useRouter, notFound } from 'next/navigation'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { ArrowLeft, Calendar, User, Tag, Pencil, AlertCircle } from 'lucide-react'
@@ -30,31 +29,32 @@ import {
 import { Header } from '@/components/layout/header'
 import { Footer } from '@/components/layout/footer'
 import { useAuth } from '@/hooks/use-auth'
-import { getPost, updatePost } from '@/lib/api/posts'
-import { getPostCategories } from '@/lib/api/post-categories'
-import type { PostResponse, PostCategoryResponse } from '@/lib/api/types'
+import { getNotice, updateNotice } from '@/lib/api/notices'
+import { getNoticeCategories } from '@/lib/api/notice-categories'
+import type { NoticeResponse, NoticeCategoryResponse } from '@/lib/api/types'
+import { toast } from 'sonner'
 
 type EditForm = { title: string; markdownContent: string; categoryId: string; coverImgUrl: string }
 
 export default function PostPage() {
   const params = useParams()
+  const router = useRouter()
   const id = Number(params.slug)
   const { token, canAccessUiItem } = useAuth()
   const canEdit = canAccessUiItem('admin_blog_post')
 
-  const [post, setPost] = useState<PostResponse | null>(null)
+  const [post, setPost] = useState<NoticeResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFoundError, setNotFoundError] = useState(false)
 
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [editForm, setEditForm] = useState<EditForm>({ title: '', markdownContent: '', categoryId: '', coverImgUrl: '' })
-  const [categories, setCategories] = useState<PostCategoryResponse[]>([])
-  const [isSaving, setIsSaving] = useState(false)
+  const [categories, setCategories] = useState<NoticeCategoryResponse[]>([])
   const [saveError, setSaveError] = useState<string | null>(null)
 
   const loadPost = useCallback(() => {
     if (isNaN(id)) { setNotFoundError(true); setLoading(false); return }
-    getPost(id)
+    getNotice(id)
       .then(setPost)
       .catch(() => setNotFoundError(true))
       .finally(() => setLoading(false))
@@ -72,7 +72,7 @@ export default function PostPage() {
     })
     setSaveError(null)
     if (token && categories.length === 0) {
-      getPostCategories(token).then(setCategories).catch(() => {})
+      getNoticeCategories(token).then(setCategories).catch(() => {})
     }
     setIsEditOpen(true)
   }
@@ -80,10 +80,25 @@ export default function PostPage() {
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!token || !post) return
-    setIsSaving(true)
+
+    const previousPost = post
+    const categoryName =
+      categories.find((c) => c.id.toString() === editForm.categoryId)?.name ?? post.categoryName
+    const optimisticPost: NoticeResponse = {
+      ...post,
+      title: editForm.title,
+      markdownContent: editForm.markdownContent,
+      categoryId: Number(editForm.categoryId),
+      categoryName,
+      coverImgUrl: editForm.coverImgUrl.trim() || undefined,
+    }
+
+    setPost(optimisticPost)
+    setIsEditOpen(false)
     setSaveError(null)
+
     try {
-      const updated = await updatePost(
+      const updated = await updateNotice(
         post.id,
         {
           title: editForm.title,
@@ -94,11 +109,11 @@ export default function PostPage() {
         token,
       )
       setPost(updated)
-      setIsEditOpen(false)
     } catch {
-      setSaveError('Erro ao salvar o post. Tente novamente.')
-    } finally {
-      setIsSaving(false)
+      setPost(previousPost)
+      setIsEditOpen(true)
+      setSaveError('Erro ao salvar o aviso. Tente novamente.')
+      toast.error('Erro ao salvar o aviso. Tente novamente.')
     }
   }
 
@@ -131,11 +146,9 @@ export default function PostPage() {
         <article className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
           {/* Nav row: back button left, edit button right */}
           <div className="mb-8 flex items-center justify-between">
-            <Button variant="outline" asChild>
-              <Link href="/blog">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Voltar ao blog
-              </Link>
+            <Button variant="outline" onClick={() => router.back()}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Voltar
             </Button>
             {canEdit && (
               <Button
@@ -144,7 +157,7 @@ export default function PostPage() {
                 className="gap-2"
               >
                 <Pencil className="h-4 w-4" />
-                Editar post
+                Editar aviso
               </Button>
             )}
           </div>
@@ -207,8 +220,8 @@ export default function PostPage() {
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
           <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Editar Post</DialogTitle>
-              <DialogDescription>Atualize as informações do post.</DialogDescription>
+              <DialogTitle>Editar Aviso</DialogTitle>
+              <DialogDescription>Atualize as informações do aviso.</DialogDescription>
             </DialogHeader>
 
             <form onSubmit={handleEditSubmit} className="space-y-4">
@@ -278,10 +291,10 @@ export default function PostPage() {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={isSaving || !editForm.categoryId}
+                  disabled={!editForm.categoryId}
                   className="bg-accent text-accent-foreground hover:bg-accent/90"
                 >
-                  {isSaving ? 'Salvando...' : 'Salvar Alterações'}
+                  Salvar Alterações
                 </Button>
               </DialogFooter>
             </form>

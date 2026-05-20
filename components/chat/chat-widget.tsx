@@ -25,12 +25,12 @@ function getMockResponse(userMessage: string): string {
 
   // Eventos
   if (message.includes('evento') || message.includes('semana acadêmica')) {
-    return 'Temos vários eventos programados! A Semana Acadêmica 2024 está com inscrições abertas, ocorrendo de 15 a 22 de Março. Também teremos uma palestra sobre Empreendedorismo Digital em 25 de Março. Confira todos os detalhes na seção de Blog.'
+    return 'Temos vários eventos programados! A Semana Acadêmica 2024 está com inscrições abertas, ocorrendo de 15 a 22 de Março. Também teremos uma palestra sobre Empreendedorismo Digital em 25 de Março. Confira todos os detalhes na seção de Avisos.'
   }
 
   // Estágios
   if (message.includes('estágio') || message.includes('vaga') || message.includes('emprego')) {
-    return 'Temos várias oportunidades de estágio disponíveis! Atualmente há vagas em Desenvolvimento Web (R$ 1.800), Ciência de Dados (R$ 2.000) e DevOps (R$ 1.900). Acesse a seção de Blog para ver os detalhes completos e como se candidatar.'
+    return 'Temos várias oportunidades de estágio disponíveis! Atualmente há vagas em Desenvolvimento Web (R$ 1.800), Ciência de Dados (R$ 2.000) e DevOps (R$ 1.900). Acesse a seção de Avisos para ver os detalhes completos e como se candidatar.'
   }
 
   // Documentos

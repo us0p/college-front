@@ -62,10 +62,10 @@ export default function AdminDashboard() {
 
   const statCards = [
     {
-      title: 'Total de Posts',
+      title: 'Total de Avisos',
       value: stats.posts,
       icon: FileText,
-      description: 'Publicações no blog',
+      description: 'Avisos publicados',
       color: 'text-blue-600 bg-blue-100',
     },
     {

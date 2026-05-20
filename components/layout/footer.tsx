@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { GraduationCap, Mail, Phone, MapPin } from 'lucide-react'
+import Image from 'next/image'
+import { Mail, Phone, MapPin } from 'lucide-react'
 
 export function Footer() {
   return (
@@ -9,9 +10,7 @@ export function Footer() {
           {/* Logo e Descrição */}
           <div className="space-y-4">
             <Link href="/" className="flex items-center gap-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent">
-                <GraduationCap className="h-6 w-6 text-accent-foreground" />
-              </div>
+              <Image src="/mural_uni_logo_white_bg.png" alt="Mural Universitário" width={64} height={64} className="rounded-lg" />
               <span className="text-lg font-bold">Mural Universitário</span>
             </Link>
             <p className="text-sm text-primary-foreground/80">
@@ -31,7 +30,7 @@ export function Footer() {
                   href="/blog"
                   className="text-sm text-primary-foreground/80 transition-colors hover:text-accent"
                 >
-                  Blog
+                  Avisos
                 </Link>
               </li>
               <li>
@@ -53,46 +52,7 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Categorias */}
-          <div>
-            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider">
-              Categorias
-            </h3>
-            <ul className="space-y-2">
-              <li>
-                <Link
-                  href="/blog?categoria=eventos"
-                  className="text-sm text-primary-foreground/80 transition-colors hover:text-accent"
-                >
-                  Eventos
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/blog?categoria=estagios"
-                  className="text-sm text-primary-foreground/80 transition-colors hover:text-accent"
-                >
-                  Estágios
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/blog?categoria=anuncios"
-                  className="text-sm text-primary-foreground/80 transition-colors hover:text-accent"
-                >
-                  Anúncios
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/blog?categoria=noticias"
-                  className="text-sm text-primary-foreground/80 transition-colors hover:text-accent"
-                >
-                  Notícias
-                </Link>
-              </li>
-            </ul>
-          </div>
+          <div aria-hidden="true" />
 
           {/* Contato */}
           <div>
@@ -106,11 +66,11 @@ export function Footer() {
               </li>
               <li className="flex items-center gap-2 text-sm text-primary-foreground/80">
                 <Phone className="h-4 w-4 text-accent" />
-                (11) 3000-0000
+		+55 (11) 96427-5767
               </li>
               <li className="flex items-start gap-2 text-sm text-primary-foreground/80">
                 <MapPin className="h-4 w-4 shrink-0 text-accent" />
-                Av. Universitária, 1000
+		Rua Casa do Ator, 294
                 <br />
                 São Paulo - SP
               </li>

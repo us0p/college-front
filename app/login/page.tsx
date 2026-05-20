@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { GraduationCap, User, Lock, AlertCircle, ArrowLeft } from 'lucide-react'
+import { User, Lock, AlertCircle, ArrowLeft } from 'lucide-react'
+import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -57,9 +58,7 @@ export default function LoginPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
-              <GraduationCap className="h-6 w-6 text-primary-foreground" />
-            </div>
+            <Image src="/mural_uni_logo.png" alt="Mural Universitário" width={64} height={64} className="rounded-lg" />
             <span className="text-lg font-bold text-foreground">Mural Universitário</span>
           </div>
 
@@ -126,12 +125,12 @@ export default function LoginPage() {
       <div className="hidden flex-1 bg-primary lg:block">
         <div className="flex h-full flex-col items-center justify-center p-12">
           <div className="max-w-md text-center">
-            <div className="mx-auto mb-8 flex h-20 w-20 items-center justify-center rounded-2xl bg-accent">
-              <GraduationCap className="h-10 w-10 text-accent-foreground" />
+            <div className="mx-auto mb-8 flex justify-center">
+              <Image src="/mural_uni_logo_white_bg.png" alt="Mural Universitário" width={140} height={140} className="rounded-2xl" />
             </div>
             <h2 className="text-3xl font-bold text-primary-foreground">Painel Administrativo</h2>
             <p className="mt-4 text-lg text-primary-foreground/80">
-              Gerencie posts, documentos, usuários e grupos de acesso do Mural Universitário.
+              Gerencie avisos, documentos, usuários e grupos de acesso do Mural Universitário.
             </p>
           </div>
         </div>

@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard,
@@ -8,9 +9,9 @@ import {
   Users,
   Shield,
   LogOut,
-  GraduationCap,
   ChevronLeft,
   Newspaper,
+  Tag,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/use-auth'
@@ -19,7 +20,8 @@ import type { UiItemName } from '@/lib/ui-item-routes'
 
 const sidebarLinks: { href: string; label: string; icon: React.ElementType; uiItemName: UiItemName }[] = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, uiItemName: 'admin_dashboard' },
-  { href: '/admin/posts', label: 'Posts do Blog', icon: Newspaper, uiItemName: 'admin_blog_post' },
+  { href: '/admin/posts', label: 'Avisos', icon: Newspaper, uiItemName: 'admin_blog_post' },
+  { href: '/admin/categorias', label: 'Categorias', icon: Tag, uiItemName: 'admin_notice_categories' },
   { href: '/admin/documentos', label: 'Documentos', icon: FileText, uiItemName: 'admin_documents' },
   { href: '/admin/usuarios', label: 'Usuários', icon: Users, uiItemName: 'admin_users' },
   { href: '/admin/grupos', label: 'Grupos de Acesso', icon: Shield, uiItemName: 'admin_access_groups' },
@@ -35,9 +37,7 @@ export function AdminSidebar() {
     <aside className="flex h-screen w-64 flex-col border-r border-sidebar-border bg-sidebar">
       {/* Logo */}
       <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-4">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-primary">
-          <GraduationCap className="h-5 w-5 text-sidebar-primary-foreground" />
-        </div>
+        <Image src="/mural_uni_logo_white_bg.png" alt="Mural Universitário" width={48} height={48} className="rounded-lg" />
         <div>
           <p className="text-sm font-semibold text-sidebar-foreground">Mural</p>
           <p className="text-xs text-sidebar-foreground/60">Painel Admin</p>

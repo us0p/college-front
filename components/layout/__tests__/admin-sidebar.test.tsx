@@ -34,7 +34,7 @@ describe('AdminSidebar', () => {
     render(<AdminSidebar />)
 
     expect(screen.getByText('Dashboard')).toBeInTheDocument()
-    expect(screen.getByText('Posts do Blog')).toBeInTheDocument()
+    expect(screen.getByText('Avisos')).toBeInTheDocument()
     expect(screen.getByText('Documentos')).toBeInTheDocument()
     expect(screen.getByText('Usuários')).toBeInTheDocument()
     expect(screen.getByText('Grupos de Acesso')).toBeInTheDocument()
@@ -48,7 +48,7 @@ describe('AdminSidebar', () => {
     render(<AdminSidebar />)
 
     expect(screen.getByText('Dashboard')).toBeInTheDocument()
-    expect(screen.getByText('Posts do Blog')).toBeInTheDocument()
+    expect(screen.getByText('Avisos')).toBeInTheDocument()
     expect(screen.getByText('Grupos de Acesso')).toBeInTheDocument()
     expect(screen.queryByText('Usuários')).not.toBeInTheDocument()
     expect(screen.queryByText('Documentos')).not.toBeInTheDocument()
@@ -60,7 +60,7 @@ describe('AdminSidebar', () => {
     render(<AdminSidebar />)
 
     expect(screen.getByText('Dashboard')).toBeInTheDocument()
-    expect(screen.queryByText('Posts do Blog')).not.toBeInTheDocument()
+    expect(screen.queryByText('Avisos')).not.toBeInTheDocument()
     expect(screen.queryByText('Documentos')).not.toBeInTheDocument()
     expect(screen.queryByText('Usuários')).not.toBeInTheDocument()
     expect(screen.queryByText('Grupos de Acesso')).not.toBeInTheDocument()

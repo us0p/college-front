@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import {
   Calendar,
@@ -17,6 +17,8 @@ import { Input } from '@/components/ui/input'
 import { Header } from '@/components/layout/header'
 import { Footer } from '@/components/layout/footer'
 import { addSubscriber, getSubscribers } from '@/lib/storage'
+import { getStats } from '@/lib/api/stats'
+import type { StatsResponse } from '@/lib/api/types'
 
 const benefits = [
   {
@@ -49,6 +51,11 @@ export default function HomePage() {
   const [email, setEmail] = useState('')
   const [subscribed, setSubscribed] = useState(false)
   const [error, setError] = useState('')
+  const [stats, setStats] = useState<StatsResponse | null>(null)
+
+  useEffect(() => {
+    getStats().then(setStats).catch(() => {})
+  }, [])
 
   const handleSubscribe = (e: React.FormEvent) => {
     e.preventDefault()
@@ -90,11 +97,13 @@ export default function HomePage() {
           <div className="relative mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8 lg:py-32">
             <div className="grid items-center gap-12 lg:grid-cols-2">
               <div className="space-y-8">
-                <div className="inline-flex items-center rounded-full border border-accent/30 bg-accent/10 px-4 py-1.5">
-                  <span className="text-sm font-medium text-accent">
-                    Novidade: Semana Acadêmica 2024
-                  </span>
-                </div>
+                {stats?.latest_news && (
+                  <div className="inline-flex items-center rounded-full border border-accent/30 bg-accent/10 px-4 py-1.5">
+                    <span className="text-sm font-medium text-accent">
+                      Novidade: {stats.latest_news}
+                    </span>
+                  </div>
+                )}
 
                 <h1 className="text-4xl font-bold leading-tight tracking-tight text-primary-foreground sm:text-5xl lg:text-6xl">
                   <span className="text-balance">
@@ -116,7 +125,7 @@ export default function HomePage() {
                     className="bg-accent text-accent-foreground hover:bg-accent/90"
                   >
                     <Link href="/blog">
-                      Ver publicações
+                      Ver avisos
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
                   </Button>
@@ -134,19 +143,25 @@ export default function HomePage() {
               {/* Stats */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="rounded-2xl border border-primary-foreground/10 bg-primary-foreground/5 p-6 backdrop-blur">
-                  <p className="text-4xl font-bold text-accent">500+</p>
+                  <p className="text-4xl font-bold text-accent">
+                    {stats ? stats.connected_students.toLocaleString('pt-BR') : '—'}
+                  </p>
                   <p className="mt-1 text-primary-foreground/70">
                     Alunos conectados
                   </p>
                 </div>
                 <div className="rounded-2xl border border-primary-foreground/10 bg-primary-foreground/5 p-6 backdrop-blur">
-                  <p className="text-4xl font-bold text-accent">50+</p>
+                  <p className="text-4xl font-bold text-accent">
+                    {stats ? stats.job_post_count.toLocaleString('pt-BR') : '—'}
+                  </p>
                   <p className="mt-1 text-primary-foreground/70">
                     Vagas de estágio
                   </p>
                 </div>
                 <div className="rounded-2xl border border-primary-foreground/10 bg-primary-foreground/5 p-6 backdrop-blur">
-                  <p className="text-4xl font-bold text-accent">30+</p>
+                  <p className="text-4xl font-bold text-accent">
+                    {stats ? stats.semester_event_count.toLocaleString('pt-BR') : '—'}
+                  </p>
                   <p className="mt-1 text-primary-foreground/70">
                     Eventos por semestre
                   </p>

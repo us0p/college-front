@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useInView } from 'react-intersection-observer'
@@ -11,22 +11,23 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Header } from '@/components/layout/header'
 import { Footer } from '@/components/layout/footer'
-import { getPosts } from '@/lib/api/posts'
-import type { PostResponse } from '@/lib/api/types'
+import { getNotices } from '@/lib/api/notices'
+import type { NoticeResponse } from '@/lib/api/types'
 
 const POSTS_PER_PAGE = 4
+const DEBOUNCE_MS = 1000
 
 function stripMarkdown(text: string): string {
   return text
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')          // remove images ![alt](url)
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')        // [label](url) → label only
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
     .replace(/#{1,6}\s+/g, '')
     .replace(/[*_`>]/g, '')
     .replace(/\n+/g, ' ')
     .trim()
 }
 
-function PostCard({ post }: { post: PostResponse }) {
+function PostCard({ post }: { post: NoticeResponse }) {
   const excerpt = stripMarkdown(post.markdownContent).slice(0, 140)
 
   return (
@@ -34,7 +35,6 @@ function PostCard({ post }: { post: PostResponse }) {
       href={`/blog/${post.id}`}
       className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition-all hover:border-accent/50 hover:shadow-lg"
     >
-      {/* Cover image */}
       <div className="relative aspect-video overflow-hidden">
         {post.coverImgUrl ? (
           <Image
@@ -56,7 +56,6 @@ function PostCard({ post }: { post: PostResponse }) {
         )}
       </div>
 
-      {/* Text content */}
       <div className="flex flex-1 flex-col p-5">
         <h3 className="mb-2 line-clamp-2 text-lg font-semibold text-card-foreground transition-colors group-hover:text-accent">
           {post.title}
@@ -84,51 +83,58 @@ function BlogContent() {
   const searchParams = useSearchParams()
   const initialSearch = searchParams.get('q') ?? ''
 
-  const [allPosts, setAllPosts] = useState<PostResponse[]>([])
-  const [displayedPosts, setDisplayedPosts] = useState<PostResponse[]>([])
-  const [page, setPage] = useState(1)
-  const [hasMore, setHasMore] = useState(true)
+  const [posts, setPosts] = useState<NoticeResponse[]>([])
+  const [apiPage, setApiPage] = useState(0)
+  const [hasMore, setHasMore] = useState(false)
   const [searchQuery, setSearchQuery] = useState(initialSearch)
   const [isLoading, setIsLoading] = useState(true)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const activeQuery = useRef(initialSearch)
 
   const { ref, inView } = useInView({ threshold: 0, rootMargin: '100px' })
 
-  useEffect(() => {
-    getPosts()
-      .then((data) => {
-        const sorted = data.sort(
-          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-        )
-        setAllPosts(sorted)
-      })
-      .finally(() => setIsLoading(false))
+  const fetchPage = useCallback(async (title: string, page: number, replace: boolean) => {
+    try {
+      const data = await getNotices({ searchParam: title || undefined, page, size: POSTS_PER_PAGE })
+      setPosts((prev) => replace ? data.content : [...prev, ...data.content])
+      setApiPage(page)
+      setHasMore(data.content.length > 0 && (page + 1) < data.totalPages)
+    } catch {
+      if (replace) setPosts([])
+      setHasMore(false)
+    } finally {
+      setIsLoading(false)
+      setIsLoadingMore(false)
+    }
   }, [])
 
-  const filteredPosts = useCallback(() => {
-    if (!searchQuery.trim()) return allPosts
-    const q = searchQuery.toLowerCase()
-    return allPosts.filter(
-      (p) => p.title.toLowerCase().includes(q) || p.username.toLowerCase().includes(q),
-    )
-  }, [allPosts, searchQuery])
-
+  // Initial fetch
   useEffect(() => {
-    const posts = filteredPosts()
-    setDisplayedPosts(posts.slice(0, POSTS_PER_PAGE))
-    setPage(1)
-    setHasMore(posts.length > POSTS_PER_PAGE)
-  }, [filteredPosts])
+    setIsLoading(true)
+    fetchPage(initialSearch, 0, true)
+  }, [fetchPage, initialSearch])
 
+  // Debounced search
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value)
+    if (debounceTimer.current) clearTimeout(debounceTimer.current)
+    debounceTimer.current = setTimeout(() => {
+      activeQuery.current = value
+      setIsLoading(true)
+      setPosts([])
+      fetchPage(value, 0, true)
+    }, DEBOUNCE_MS)
+  }
+
+  // Infinite scroll: load next page when sentinel comes into view
   useEffect(() => {
-    if (inView && hasMore) {
-      const posts = filteredPosts()
-      const nextPage = page + 1
-      const next = posts.slice(0, nextPage * POSTS_PER_PAGE)
-      setDisplayedPosts(next)
-      setPage(nextPage)
-      setHasMore(next.length < posts.length)
+    if (inView && hasMore && !isLoadingMore && !isLoading) {
+      setIsLoadingMore(true)
+      fetchPage(activeQuery.current, apiPage + 1, false)
     }
-  }, [inView, hasMore, page, filteredPosts])
+  }, [inView, hasMore, isLoadingMore, isLoading, apiPage, fetchPage])
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -138,7 +144,7 @@ function BlogContent() {
         {/* Hero */}
         <section className="border-b border-border bg-card py-12">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">Blog</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">Avisos</h1>
             <p className="mt-2 text-lg text-muted-foreground">
               Confira as últimas novidades, eventos e oportunidades.
             </p>
@@ -153,16 +159,16 @@ function BlogContent() {
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   type="text"
-                  placeholder="Buscar publicações..."
+                  placeholder="Buscar avisos..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => handleSearchChange(e.target.value)}
                   className="pl-10"
                 />
               </div>
               {searchQuery && (
                 <Badge variant="secondary" className="gap-1">
                   &quot;{searchQuery}&quot;
-                  <button onClick={() => setSearchQuery('')}>
+                  <button onClick={() => handleSearchChange('')}>
                     <X className="h-3 w-3" />
                   </button>
                 </Badge>
@@ -178,11 +184,11 @@ function BlogContent() {
               <div className="flex justify-center py-12">
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-accent border-t-transparent" />
               </div>
-            ) : displayedPosts.length === 0 ? (
+            ) : posts.length === 0 ? (
               <div className="py-12 text-center">
-                <p className="text-lg text-muted-foreground">Nenhuma publicação encontrada.</p>
+                <p className="text-lg text-muted-foreground">Nenhum aviso encontrado.</p>
                 {searchQuery && (
-                  <Button variant="outline" className="mt-4" onClick={() => setSearchQuery('')}>
+                  <Button variant="outline" className="mt-4" onClick={() => handleSearchChange('')}>
                     Limpar busca
                   </Button>
                 )}
@@ -190,20 +196,23 @@ function BlogContent() {
             ) : (
               <>
                 <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                  {displayedPosts.map((post) => (
+                  {posts.map((post) => (
                     <PostCard key={post.id} post={post} />
                   ))}
                 </div>
 
+                {/* Infinite scroll sentinel */}
                 {hasMore && (
                   <div ref={ref} className="mt-8 flex justify-center">
-                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-accent border-t-transparent" />
+                    {isLoadingMore && (
+                      <div className="h-8 w-8 animate-spin rounded-full border-4 border-accent border-t-transparent" />
+                    )}
                   </div>
                 )}
 
-                {!hasMore && displayedPosts.length > 0 && (
+                {!hasMore && posts.length > 0 && (
                   <p className="mt-8 text-center text-sm text-muted-foreground">
-                    Você chegou ao fim das publicações.
+                    Você chegou ao fim dos avisos.
                   </p>
                 )}
               </>

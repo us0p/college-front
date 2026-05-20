@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { getPostCategories } from '../post-categories'
+import { getNoticeCategories } from '../notice-categories'
 import { apiClient, ApiError } from '../client'
-import type { PostCategoryResponse } from '../types'
+import type { NoticeCategoryResponse } from '../types'
 
 vi.mock('../client', async (importOriginal) => {
   const mod = await importOriginal<typeof import('../client')>()
@@ -11,27 +11,27 @@ vi.mock('../client', async (importOriginal) => {
   }
 })
 
-const mockCategories: PostCategoryResponse[] = [
+const mockCategories: NoticeCategoryResponse[] = [
   { id: 1, name: 'Eventos' },
   { id: 2, name: 'Estágios' },
   { id: 3, name: 'Anúncios' },
 ]
 
-describe('getPostCategories', () => {
+describe('getNoticeCategories', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('calls GET /api/post-categories with the provided token', async () => {
+  it('calls GET /api/notice-categories with the provided token', async () => {
     vi.mocked(apiClient.get).mockResolvedValue(mockCategories)
 
-    await getPostCategories('my-token')
+    await getNoticeCategories('my-token')
 
-    expect(apiClient.get).toHaveBeenCalledWith('/api/post-categories', 'my-token')
+    expect(apiClient.get).toHaveBeenCalledWith('/api/notice-categories', 'my-token')
   })
 
   it('returns the list of categories', async () => {
     vi.mocked(apiClient.get).mockResolvedValue(mockCategories)
 
-    const result = await getPostCategories('my-token')
+    const result = await getNoticeCategories('my-token')
 
     expect(result).toEqual(mockCategories)
   })
@@ -39,6 +39,6 @@ describe('getPostCategories', () => {
   it('propagates ApiError on 401', async () => {
     vi.mocked(apiClient.get).mockRejectedValue(new ApiError(401, 'Unauthorized'))
 
-    await expect(getPostCategories('bad-token')).rejects.toThrow(ApiError)
+    await expect(getNoticeCategories('bad-token')).rejects.toThrow(ApiError)
   })
 })

@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
-import { Plus, Pencil, Trash2, FileText, Search, Eye, Calendar, AlertCircle } from 'lucide-react'
+import { Plus, Pencil, Trash2, FileText, Search, Eye, Calendar, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -43,9 +43,12 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { useAuth } from '@/hooks/use-auth'
-import { getPosts, createPost, updatePost, deletePost } from '@/lib/api/posts'
-import { getPostCategories } from '@/lib/api/post-categories'
-import type { PostResponse, PostCategoryResponse } from '@/lib/api/types'
+import { getNotices, createNotice, updateNotice, deleteNotice } from '@/lib/api/notices'
+import { getNoticeCategories } from '@/lib/api/notice-categories'
+import type { NoticeResponse, NoticeCategoryResponse } from '@/lib/api/types'
+
+const PAGE_SIZE = 10
+const DEBOUNCE_MS = 1000
 
 type FormData = {
   title: string
@@ -58,47 +61,64 @@ const emptyForm: FormData = { title: '', markdownContent: '', categoryId: '', co
 
 export default function AdminPostsPage() {
   const { user, token } = useAuth()
-  const [posts, setPosts] = useState<PostResponse[]>([])
-  const [categories, setCategories] = useState<PostCategoryResponse[]>([])
+  const [posts, setPosts] = useState<NoticeResponse[]>([])
+  const [categories, setCategories] = useState<NoticeCategoryResponse[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [currentPage, setCurrentPage] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+  const [totalElements, setTotalElements] = useState(0)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
-  const [selectedPost, setSelectedPost] = useState<PostResponse | null>(null)
+  const [selectedPost, setSelectedPost] = useState<NoticeResponse | null>(null)
   const [formData, setFormData] = useState<FormData>(emptyForm)
   const [isSaving, setIsSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
-  const loadPosts = useCallback(async () => {
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const loadPosts = useCallback(async (title: string, page: number) => {
     setIsLoading(true)
     setError(null)
     try {
-      const data = await getPosts()
-      setPosts(data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()))
+      const data = await getNotices({ searchParam: title || undefined, page, size: PAGE_SIZE })
+      setPosts(data.content)
+      setTotalPages(data.totalPages)
+      setTotalElements(data.totalElements)
     } catch {
-      setError('Não foi possível carregar os posts.')
+      setError('Não foi possível carregar os avisos.')
     } finally {
       setIsLoading(false)
     }
   }, [])
 
+  // Initial load
   useEffect(() => {
-    loadPosts()
+    loadPosts('', 0)
     if (token) {
-      getPostCategories(token)
+      getNoticeCategories(token)
         .then(setCategories)
         .catch(() => setError('Não foi possível carregar as categorias.'))
     }
   }, [loadPosts, token])
 
-  const filteredPosts = posts.filter(
-    (post) =>
-      post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      post.username.toLowerCase().includes(searchQuery.toLowerCase()),
-  )
+  // Debounced search — resets to page 0
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value)
+    if (debounceTimer.current) clearTimeout(debounceTimer.current)
+    debounceTimer.current = setTimeout(() => {
+      setCurrentPage(0)
+      loadPosts(value, 0)
+    }, DEBOUNCE_MS)
+  }
 
-  const handleOpenDialog = (post?: PostResponse) => {
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+    loadPosts(searchQuery, page)
+  }
+
+  const handleOpenDialog = (post?: NoticeResponse) => {
     setFormError(null)
     if (post) {
       setSelectedPost(post)
@@ -124,14 +144,14 @@ export default function AdminPostsPage() {
       const categoryId = Number(formData.categoryId)
       const coverImgUrl = formData.coverImgUrl.trim() || undefined
       if (selectedPost) {
-        await updatePost(selectedPost.id, { title: formData.title, markdownContent: formData.markdownContent, categoryId, coverImgUrl }, token)
+        await updateNotice(selectedPost.id, { title: formData.title, markdownContent: formData.markdownContent, categoryId, coverImgUrl }, token)
       } else {
-        await createPost({ userId: user.id, title: formData.title, markdownContent: formData.markdownContent, categoryId, coverImgUrl }, token)
+        await createNotice({ userId: user.id, title: formData.title, markdownContent: formData.markdownContent, categoryId, coverImgUrl }, token)
       }
-      await loadPosts()
+      await loadPosts(searchQuery, currentPage)
       setIsDialogOpen(false)
     } catch {
-      setFormError('Erro ao salvar o post. Tente novamente.')
+      setFormError('Erro ao salvar o aviso. Tente novamente.')
     } finally {
       setIsSaving(false)
     }
@@ -140,10 +160,12 @@ export default function AdminPostsPage() {
   const handleDelete = async () => {
     if (!selectedPost || !token) return
     try {
-      await deletePost(selectedPost.id, token)
-      await loadPosts()
+      await deleteNotice(selectedPost.id, token)
+      const newPage = posts.length === 1 && currentPage > 0 ? currentPage - 1 : currentPage
+      setCurrentPage(newPage)
+      await loadPosts(searchQuery, newPage)
     } catch {
-      setError('Erro ao excluir o post.')
+      setError('Erro ao excluir o aviso.')
     } finally {
       setIsDeleteDialogOpen(false)
       setSelectedPost(null)
@@ -158,12 +180,12 @@ export default function AdminPostsPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Posts do Blog</h1>
-          <p className="text-muted-foreground">Gerencie os posts e publicações do Mural Universitário</p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Avisos</h1>
+          <p className="text-muted-foreground">Gerencie os avisos do Mural Universitário</p>
         </div>
         <Button onClick={() => handleOpenDialog()} className="bg-accent text-accent-foreground hover:bg-accent/90">
           <Plus className="mr-2 h-4 w-4" />
-          Novo Post
+          Novo Aviso
         </Button>
       </div>
 
@@ -180,13 +202,13 @@ export default function AdminPostsPage() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="text"
-            placeholder="Buscar posts..."
+            placeholder="Buscar avisos..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-10"
           />
         </div>
-        <Badge variant="outline">{filteredPosts.length} post(s)</Badge>
+        <Badge variant="outline">{totalElements} aviso(s)</Badge>
       </div>
 
       {/* Table */}
@@ -206,15 +228,15 @@ export default function AdminPostsPage() {
               <TableRow>
                 <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">Carregando...</TableCell>
               </TableRow>
-            ) : filteredPosts.length === 0 ? (
+            ) : posts.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="py-8 text-center">
                   <FileText className="mx-auto h-12 w-12 text-muted-foreground/50" />
-                  <p className="mt-2 text-muted-foreground">Nenhum post encontrado.</p>
+                  <p className="mt-2 text-muted-foreground">Nenhum aviso encontrado.</p>
                 </TableCell>
               </TableRow>
             ) : (
-              filteredPosts.map((post) => (
+              posts.map((post) => (
                 <TableRow key={post.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
@@ -258,13 +280,42 @@ export default function AdminPostsPage() {
         </Table>
       </div>
 
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            Página {currentPage + 1} de {totalPages}
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 0 || isLoading}
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Anterior
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage >= totalPages - 1 || isLoading}
+            >
+              Próxima
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Create / Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{selectedPost ? 'Editar Post' : 'Novo Post'}</DialogTitle>
+            <DialogTitle>{selectedPost ? 'Editar Aviso' : 'Novo Aviso'}</DialogTitle>
             <DialogDescription>
-              {selectedPost ? 'Atualize as informações do post.' : 'Preencha as informações do novo post.'}
+              {selectedPost ? 'Atualize as informações do aviso.' : 'Preencha as informações do novo aviso.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -344,7 +395,7 @@ export default function AdminPostsPage() {
                 disabled={isSaving || !formData.categoryId}
                 className="bg-accent text-accent-foreground hover:bg-accent/90"
               >
-                {isSaving ? 'Salvando...' : selectedPost ? 'Salvar Alterações' : 'Publicar Post'}
+                {isSaving ? 'Salvando...' : selectedPost ? 'Salvar Alterações' : 'Publicar Aviso'}
               </Button>
             </DialogFooter>
           </form>
@@ -357,7 +408,7 @@ export default function AdminPostsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir o post &quot;{selectedPost?.title}&quot;? Esta ação não pode ser desfeita.
+              Tem certeza que deseja excluir o aviso &quot;{selectedPost?.title}&quot;? Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

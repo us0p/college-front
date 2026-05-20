@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { AuthProvider } from '@/hooks/use-auth'
 import { ChatWidget } from '@/components/chat/chat-widget'
+import { Toaster } from '@/components/ui/sonner'
 import './globals.css'
 
 const _geist = Geist({ subsets: ['latin'] })
@@ -13,21 +14,8 @@ export const metadata: Metadata = {
   description: 'Seu portal de informações acadêmicas. Fique por dentro de eventos, oportunidades de estágio e anúncios importantes.',
   generator: 'v0.app',
   icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: '/apple-icon.png',
+    icon: '/mural_uni_logo_white_bg.png',
+    apple: '/mural_uni_logo_white_bg.png',
   },
 }
 
@@ -42,6 +30,7 @@ export default function RootLayout({
         <AuthProvider>
           {children}
           <ChatWidget />
+          <Toaster />
         </AuthProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
