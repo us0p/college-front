@@ -12,6 +12,14 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   token: string
+  userId: number
+  username: string
+  email: string
+  phoneNumber?: string
+  ra?: string
+  roleId: number
+  roleName: string
+  permissions: string[]
 }
 
 export interface UserResponse {
@@ -36,6 +44,14 @@ export interface UserRequest {
 export interface RoleResponse {
   id: number
   name: string
+}
+
+export interface RolePageResponse {
+  content: RoleResponse[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
 }
 
 export interface RoleRequest {
@@ -92,7 +108,6 @@ export interface NoticePageResponse {
 }
 
 export interface NoticeRequest {
-  userId: number
   title: string
   markdownContent: string
   categoryId: number

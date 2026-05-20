@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Plus, Pencil, Trash2, FileText, Search, Eye, Calendar, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -43,12 +44,10 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { useAuth } from '@/hooks/use-auth'
-import { getNotices, createNotice, updateNotice, deleteNotice } from '@/lib/api/notices'
+import { getNotices, updateNotice, deleteNotice } from '@/lib/api/notices'
 import { getNoticeCategories } from '@/lib/api/notice-categories'
 import type { NoticeResponse, NoticeCategoryResponse } from '@/lib/api/types'
-
-const PAGE_SIZE = 10
-const DEBOUNCE_MS = 1000
+import { DEBOUNCE_MS, PAGE_SIZE } from '@/lib/constants'
 
 type FormData = {
   title: string
@@ -60,7 +59,8 @@ type FormData = {
 const emptyForm: FormData = { title: '', markdownContent: '', categoryId: '', coverImgUrl: '' }
 
 export default function AdminPostsPage() {
-  const { user, token } = useAuth()
+  const router = useRouter()
+  const { token } = useAuth()
   const [posts, setPosts] = useState<NoticeResponse[]>([])
   const [categories, setCategories] = useState<NoticeCategoryResponse[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -118,36 +118,27 @@ export default function AdminPostsPage() {
     loadPosts(searchQuery, page)
   }
 
-  const handleOpenDialog = (post?: NoticeResponse) => {
+  const handleOpenEditDialog = (post: NoticeResponse) => {
     setFormError(null)
-    if (post) {
-      setSelectedPost(post)
-      setFormData({
-        title: post.title,
-        markdownContent: post.markdownContent,
-        categoryId: post.categoryId?.toString() ?? '',
-        coverImgUrl: post.coverImgUrl ?? '',
-      })
-    } else {
-      setSelectedPost(null)
-      setFormData(emptyForm)
-    }
+    setSelectedPost(post)
+    setFormData({
+      title: post.title,
+      markdownContent: post.markdownContent,
+      categoryId: post.categoryId?.toString() ?? '',
+      coverImgUrl: post.coverImgUrl ?? '',
+    })
     setIsDialogOpen(true)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!token || !user) return
+    if (!token || !selectedPost) return
     setIsSaving(true)
     setFormError(null)
     try {
       const categoryId = Number(formData.categoryId)
       const coverImgUrl = formData.coverImgUrl.trim() || undefined
-      if (selectedPost) {
-        await updateNotice(selectedPost.id, { title: formData.title, markdownContent: formData.markdownContent, categoryId, coverImgUrl }, token)
-      } else {
-        await createNotice({ userId: user.id, title: formData.title, markdownContent: formData.markdownContent, categoryId, coverImgUrl }, token)
-      }
+      await updateNotice(selectedPost.id, { title: formData.title, markdownContent: formData.markdownContent, categoryId, coverImgUrl }, token)
       await loadPosts(searchQuery, currentPage)
       setIsDialogOpen(false)
     } catch {
@@ -183,7 +174,7 @@ export default function AdminPostsPage() {
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Avisos</h1>
           <p className="text-muted-foreground">Gerencie os avisos do Mural Universitário</p>
         </div>
-        <Button onClick={() => handleOpenDialog()} className="bg-accent text-accent-foreground hover:bg-accent/90">
+        <Button onClick={() => router.push('/admin/posts/novo')} className="bg-accent text-accent-foreground hover:bg-accent/90">
           <Plus className="mr-2 h-4 w-4" />
           Novo Aviso
         </Button>
@@ -265,7 +256,7 @@ export default function AdminPostsPage() {
                           <Eye className="h-4 w-4" />
                         </Link>
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(post)}>
+                      <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(post)}>
                         <Pencil className="h-4 w-4" />
                       </Button>
                       <Button variant="ghost" size="icon" onClick={() => { setSelectedPost(post); setIsDeleteDialogOpen(true) }}>
@@ -313,10 +304,8 @@ export default function AdminPostsPage() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{selectedPost ? 'Editar Aviso' : 'Novo Aviso'}</DialogTitle>
-            <DialogDescription>
-              {selectedPost ? 'Atualize as informações do aviso.' : 'Preencha as informações do novo aviso.'}
-            </DialogDescription>
+            <DialogTitle>Editar Aviso</DialogTitle>
+            <DialogDescription>Atualize as informações do aviso.</DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -395,7 +384,7 @@ export default function AdminPostsPage() {
                 disabled={isSaving || !formData.categoryId}
                 className="bg-accent text-accent-foreground hover:bg-accent/90"
               >
-                {isSaving ? 'Salvando...' : selectedPost ? 'Salvar Alterações' : 'Publicar Aviso'}
+                {isSaving ? 'Salvando...' : 'Salvar Alterações'}
               </Button>
             </DialogFooter>
           </form>

@@ -11,12 +11,11 @@ import {
 import { login as apiLogin } from '@/lib/api/auth'
 import { apiClient } from '@/lib/api/client'
 import { getUiPermissionObjects } from '@/lib/api/ui-items'
-import type { UserResponse, RolePermissionResponse, UiPermissionObjectResponse } from '@/lib/api/types'
+import type { LoginResponse, UserResponse, UiPermissionObjectResponse } from '@/lib/api/types'
 
-const TOKEN_KEY = 'auth_token'
-const USER_KEY = 'auth_user'
+const USER_KEY        = 'auth_user'
 const PERMISSIONS_KEY = 'auth_permissions'
-const UI_PERMISSIONS_KEY = 'auth_ui_permissions'
+const UI_PERM_KEY     = 'auth_ui_permissions'
 
 interface AuthContextType {
   user: UserResponse | null
@@ -41,60 +40,75 @@ function readLocal<T>(key: string): T | null {
   }
 }
 
+function clearStorage() {
+  localStorage.removeItem(USER_KEY)
+  localStorage.removeItem(PERMISSIONS_KEY)
+  localStorage.removeItem(UI_PERM_KEY)
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<UserResponse | null>(null)
-  const [token, setToken] = useState<string | null>(null)
-  const [permissions, setPermissions] = useState<RolePermissionResponse[]>([])
+  const [user, setUser]                   = useState<UserResponse | null>(null)
+  const [token, setToken]                 = useState<string | null>(null)   // in-memory only
+  const [permissions, setPermissions]     = useState<string[]>([])          // permission names
   const [uiPermissions, setUiPermissions] = useState<UiPermissionObjectResponse[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading]         = useState(true)
 
+  // On mount: restore session via httpOnly cookie (/api/auth/me validates it)
   useEffect(() => {
-    const storedToken = typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null
     const storedUser = readLocal<UserResponse>(USER_KEY)
-    const storedPermissions = readLocal<RolePermissionResponse[]>(PERMISSIONS_KEY)
-    const storedUiPermissions = readLocal<UiPermissionObjectResponse[]>(UI_PERMISSIONS_KEY)
-
-    if (storedToken && storedUser) {
-      setToken(storedToken)
-      setUser(storedUser)
-      setPermissions(storedPermissions ?? [])
-      setUiPermissions(storedUiPermissions ?? [])
+    if (!storedUser) {
+      setIsLoading(false)
+      return
     }
-    setIsLoading(false)
+    // Cookie is sent automatically (credentials: include configured in apiClient)
+    apiClient.get<LoginResponse>('/api/auth/me', undefined)
+      .then(async (me) => {
+        const uiPerms = await getUiPermissionObjects(me.token)
+        setToken(me.token)
+        setUser(storedUser)
+        setPermissions(me.permissions)
+        setUiPermissions(uiPerms)
+        localStorage.setItem(PERMISSIONS_KEY, JSON.stringify(me.permissions))
+        localStorage.setItem(UI_PERM_KEY, JSON.stringify(uiPerms))
+      })
+      .catch(() => {
+        clearStorage()
+      })
+      .finally(() => setIsLoading(false))
   }, [])
 
   const login = useCallback(async (username: string, password: string): Promise<void> => {
-    const { token: jwt } = await apiLogin({ username, password })
+    const result = await apiLogin({ username, password })
 
-    const [users, uiPerms] = await Promise.all([
-      apiClient.get<UserResponse[]>('/api/users', jwt),
-      getUiPermissionObjects(jwt),
-    ])
+    // Build UserResponse from login response — no extra GET /api/users call needed
+    const currentUser: UserResponse = {
+      id:          result.userId,
+      username:    result.username,
+      email:       result.email,
+      phoneNumber: result.phoneNumber,
+      ra:          result.ra,
+      roleId:      result.roleId,
+      roleName:    result.roleName,
+    }
 
-    const currentUser = users.find((u) => u.username === username)
-    if (!currentUser) throw new Error('Usuário não encontrado após autenticação.')
+    const uiPerms = await getUiPermissionObjects(result.token)
 
-    const rolePerms = await apiClient.get<RolePermissionResponse[]>(
-      `/api/role-permissions/by-role/${currentUser.roleId}`,
-      jwt,
-    )
-
-    localStorage.setItem(TOKEN_KEY, jwt)
-    localStorage.setItem(USER_KEY, JSON.stringify(currentUser))
-    localStorage.setItem(PERMISSIONS_KEY, JSON.stringify(rolePerms))
-    localStorage.setItem(UI_PERMISSIONS_KEY, JSON.stringify(uiPerms))
-
-    setToken(jwt)
+    // Token stays in memory only — NOT persisted in localStorage
+    setToken(result.token)
     setUser(currentUser)
-    setPermissions(rolePerms)
+    setPermissions(result.permissions)
     setUiPermissions(uiPerms)
+
+    // Persist user info and permissions (but not the token) for session restoration
+    localStorage.setItem(USER_KEY,        JSON.stringify(currentUser))
+    localStorage.setItem(PERMISSIONS_KEY, JSON.stringify(result.permissions))
+    localStorage.setItem(UI_PERM_KEY,     JSON.stringify(uiPerms))
   }, [])
 
   const logout = useCallback(() => {
-    localStorage.removeItem(TOKEN_KEY)
-    localStorage.removeItem(USER_KEY)
-    localStorage.removeItem(PERMISSIONS_KEY)
-    localStorage.removeItem(UI_PERMISSIONS_KEY)
+    // Clear the httpOnly cookie server-side (fire-and-forget, ignore errors)
+    void apiClient.post('/api/auth/logout', {}, undefined)?.catch?.(() => {})
+    clearStorage()
     setToken(null)
     setUser(null)
     setPermissions([])
@@ -102,8 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const hasPermission = useCallback(
-    (permissionName: string): boolean =>
-      permissions.some((p) => p.permissionName === permissionName),
+    (permissionName: string): boolean => permissions.includes(permissionName),
     [permissions],
   )
 
@@ -112,13 +125,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!user) return false
       const required = uiPermissions.filter((p) => p.uiItemName === uiItemName)
       if (required.length === 0) return true
-      const userPermissionIds = new Set(permissions.map((p) => p.permissionId))
-      return required.every((r) => userPermissionIds.has(r.permissionId))
+      return required.every((r) => permissions.includes(r.permissionName))
     },
     [user, uiPermissions, permissions],
   )
 
-  const isAdmin = permissions.some((p) => p.permissionName.startsWith('manage'))
+  // isAdmin: user holds the 'admin' permission object
+  const isAdmin = permissions.includes('admin')
 
   return (
     <AuthContext.Provider

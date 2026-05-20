@@ -60,6 +60,7 @@ export function createApiClient(baseUrl: string): ApiClient {
       return fetch(buildUrl(path), {
         method: 'GET',
         headers: buildHeaders(token),
+        credentials: 'include',
       }).then(handleResponse<T>)
     },
 
@@ -68,6 +69,7 @@ export function createApiClient(baseUrl: string): ApiClient {
         method: 'POST',
         headers: buildHeaders(token),
         body: JSON.stringify(body),
+        credentials: 'include',
       }).then(handleResponse<T>)
     },
 
@@ -76,6 +78,7 @@ export function createApiClient(baseUrl: string): ApiClient {
         method: 'PUT',
         headers: buildHeaders(token),
         body: JSON.stringify(body),
+        credentials: 'include',
       }).then(handleResponse<T>)
     },
 
@@ -83,6 +86,7 @@ export function createApiClient(baseUrl: string): ApiClient {
       return fetch(buildUrl(path), {
         method: 'DELETE',
         headers: buildHeaders(token),
+        credentials: 'include',
       }).then(handleResponse<void>)
     },
 
@@ -98,6 +102,7 @@ export function createApiClient(baseUrl: string): ApiClient {
         method: 'POST',
         headers,
         body: formData,
+        credentials: 'include',
       }).then(handleResponse<T>)
     },
   }

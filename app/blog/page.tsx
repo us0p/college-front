@@ -13,9 +13,9 @@ import { Header } from '@/components/layout/header'
 import { Footer } from '@/components/layout/footer'
 import { getNotices } from '@/lib/api/notices'
 import type { NoticeResponse } from '@/lib/api/types'
+import { DEBOUNCE_MS } from '@/lib/constants'
 
 const POSTS_PER_PAGE = 4
-const DEBOUNCE_MS = 1000
 
 function stripMarkdown(text: string): string {
   return text
