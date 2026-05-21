@@ -22,7 +22,6 @@ const mockUser: UserResponse = {
 }
 
 const mockLoginResponse: LoginResponse = {
-  token: 'jwt-token',
   userId: 1, username: 'admin', email: 'admin@test.com',
   roleId: 1, roleName: 'Administradores',
   permissions: ['admin', 'manage_users', 'manage_posts'],
@@ -42,7 +41,6 @@ function wrapper({ children }: { children: React.ReactNode }) {
 
 function setupLoginMocks() {
   vi.mocked(authApi.login).mockResolvedValue(mockLoginResponse)
-  // /api/auth/me should fail by default (no stored user → no call)
   vi.mocked(apiClient.get).mockRejectedValue(new Error('no session'))
   vi.mocked(uiItemsApi.getUiPermissionObjects).mockResolvedValue(mockUiPermissions)
 }
@@ -57,11 +55,10 @@ describe('useAuth', () => {
     spy.mockRestore()
   })
 
-  it('starts with null user and null token when no stored session', async () => {
+  it('starts with null user when no stored session', async () => {
     const { result } = renderHook(() => useAuth(), { wrapper })
     await waitFor(() => expect(result.current.isLoading).toBe(false))
     expect(result.current.user).toBeNull()
-    expect(result.current.token).toBeNull()
   })
 
   describe('login', () => {
@@ -74,30 +71,28 @@ describe('useAuth', () => {
       expect(authApi.login).toHaveBeenCalledWith({ username: 'admin', password: 'password123' })
     })
 
-    it('sets user and token from login response without fetching /api/users', async () => {
+    it('sets user from login response without fetching /api/users', async () => {
       const { result } = renderHook(() => useAuth(), { wrapper })
       await waitFor(() => expect(result.current.isLoading).toBe(false))
       await act(async () => { await result.current.login('admin', 'secret') })
       expect(result.current.user).toEqual(mockUser)
-      expect(result.current.token).toBe('jwt-token')
-      // Must NOT call /api/users — user info comes from login response
       expect(apiClient.get).not.toHaveBeenCalledWith('/api/users', expect.anything())
     })
 
-    it('fetches only UI permissions after login', async () => {
+    it('fetches UI permissions after login', async () => {
       const { result } = renderHook(() => useAuth(), { wrapper })
       await waitFor(() => expect(result.current.isLoading).toBe(false))
       await act(async () => { await result.current.login('admin', 'secret') })
-      expect(uiItemsApi.getUiPermissionObjects).toHaveBeenCalledWith('jwt-token')
+      expect(uiItemsApi.getUiPermissionObjects).toHaveBeenCalled()
     })
 
-    it('persists user and permissions (but not token) in localStorage', async () => {
+    it('persists user to localStorage (but not permissions)', async () => {
       const { result } = renderHook(() => useAuth(), { wrapper })
       await waitFor(() => expect(result.current.isLoading).toBe(false))
       await act(async () => { await result.current.login('admin', 'secret') })
-      expect(localStorage.getItem('auth_token')).toBeNull()   // token NOT in localStorage
       expect(JSON.parse(localStorage.getItem('auth_user')!)).toEqual(mockUser)
-      expect(JSON.parse(localStorage.getItem('auth_ui_permissions')!)).toEqual(mockUiPermissions)
+      expect(localStorage.getItem('auth_permissions')).toBeNull()
+      expect(localStorage.getItem('auth_ui_permissions')).toBeNull()
     })
 
     it('sets isAdmin true when login response includes "admin" permission', async () => {
@@ -108,10 +103,7 @@ describe('useAuth', () => {
     })
 
     it('sets isAdmin false when login response does not include "admin" permission', async () => {
-      vi.mocked(authApi.login).mockResolvedValue({
-        ...mockLoginResponse,
-        permissions: ['manage_users'],
-      })
+      vi.mocked(authApi.login).mockResolvedValue({ ...mockLoginResponse, permissions: ['manage_users'] })
       const { result } = renderHook(() => useAuth(), { wrapper })
       await waitFor(() => expect(result.current.isLoading).toBe(false))
       await act(async () => { await result.current.login('student', 'pass') })
@@ -124,12 +116,11 @@ describe('useAuth', () => {
       await waitFor(() => expect(result.current.isLoading).toBe(false))
       await expect(act(async () => { await result.current.login('wrong', 'wrong') })).rejects.toThrow()
       expect(result.current.user).toBeNull()
-      expect(result.current.token).toBeNull()
     })
   })
 
   describe('logout', () => {
-    it('clears user, token, and localStorage', async () => {
+    it('clears user and localStorage', async () => {
       setupLoginMocks()
       const { result } = renderHook(() => useAuth(), { wrapper })
       await waitFor(() => expect(result.current.isLoading).toBe(false))
@@ -137,7 +128,6 @@ describe('useAuth', () => {
       expect(result.current.user).not.toBeNull()
       act(() => { result.current.logout() })
       expect(result.current.user).toBeNull()
-      expect(result.current.token).toBeNull()
       expect(localStorage.getItem('auth_user')).toBeNull()
     })
   })
@@ -199,7 +189,6 @@ describe('useAuth', () => {
 
     it('checks each UI item correctly against permission names', async () => {
       const result = await loginAndGet()
-      // admin has: admin, manage_users, manage_posts — does NOT have upload_docs
       expect(result.current.canAccessUiItem('admin_users')).toBe(true)
       expect(result.current.canAccessUiItem('admin_blog_post')).toBe(true)
       expect(result.current.canAccessUiItem('admin_access_groups')).toBe(true)
@@ -217,7 +206,6 @@ describe('useAuth', () => {
       await waitFor(() => expect(result.current.isLoading).toBe(false))
 
       expect(result.current.user).toEqual(mockUser)
-      expect(result.current.token).toBe('jwt-token')
       expect(result.current.isAdmin).toBe(true)
     })
 

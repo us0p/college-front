@@ -1,174 +1,127 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import {
-  Plus,
-  Pencil,
-  Trash2,
-  FileText,
-  Search,
-  Upload,
-  Lock,
-  Unlock,
-  Brain,
+  Plus, Trash2, FileText, Search, Brain, AlertCircle, Download,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import {
-  getDocuments,
-  saveDocument,
-  deleteDocument,
-  initializeStorage,
-} from '@/lib/storage'
-import { useAuth } from '@/hooks/use-auth'
-import type { Document } from '@/lib/types'
+import { getDocuments, uploadDocument, deleteDocument } from '@/lib/api/documents'
+import type { DocumentResponse } from '@/lib/api/types'
 
-const emptyDocument: Omit<Document, 'id' | 'createdAt' | 'uploadedBy'> = {
-  name: '',
-  fileName: '',
-  fileType: 'application/pdf',
-  fileSize: 0,
-  isPublic: true,
-  isKnowledgeBase: false,
-  minAccessLevel: 1,
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 export default function AdminDocumentosPage() {
-  const { user } = useAuth()
-  const [documents, setDocuments] = useState<Document[]>([])
+  const [documents, setDocuments] = useState<DocumentResponse[]>([])
   const [searchQuery, setSearchQuery] = useState('')
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
-  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null)
-  const [formData, setFormData] =
-    useState<Omit<Document, 'id' | 'createdAt' | 'uploadedBy'>>(emptyDocument)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    initializeStorage()
-    loadDocuments()
+  const [isUploadOpen, setIsUploadOpen] = useState(false)
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false)
+  const [selected, setSelected] = useState<DocumentResponse | null>(null)
+
+  const [file, setFile] = useState<File | null>(null)
+  const [description, setDescription] = useState('')
+  const [knowledgeBase, setKnowledgeBase] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      setDocuments(await getDocuments())
+    } catch {
+      setError('Não foi possível carregar os documentos.')
+    } finally {
+      setIsLoading(false)
+    }
   }, [])
 
-  const loadDocuments = () => {
-    const docs = getDocuments()
-    setDocuments(docs)
-  }
+  useEffect(() => { load() }, [load])
 
-  const filteredDocuments = documents.filter((doc) =>
-    doc.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const filtered = documents.filter((d) =>
+    d.fileName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (d.description ?? '').toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const handleOpenDialog = (doc?: Document) => {
-    if (doc) {
-      setSelectedDocument(doc)
-      setFormData({
-        name: doc.name,
-        fileName: doc.fileName,
-        fileType: doc.fileType,
-        fileSize: doc.fileSize,
-        isPublic: doc.isPublic,
-        isKnowledgeBase: doc.isKnowledgeBase,
-        minAccessLevel: doc.minAccessLevel,
-      })
-    } else {
-      setSelectedDocument(null)
-      setFormData(emptyDocument)
-    }
-    setIsDialogOpen(true)
+  const handleOpenUpload = () => {
+    setFile(null)
+    setDescription('')
+    setKnowledgeBase(false)
+    setUploadError(null)
+    setIsUploadOpen(true)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault()
-
-    const docToSave: Document = {
-      id: selectedDocument?.id || `doc-${Date.now()}`,
-      ...formData,
-      uploadedBy: selectedDocument?.uploadedBy || user?.username || 'admin',
-      createdAt: selectedDocument?.createdAt || new Date().toISOString(),
-    }
-
-    saveDocument(docToSave)
-    loadDocuments()
-    setIsDialogOpen(false)
-  }
-
-  const handleDelete = () => {
-    if (selectedDocument) {
-      deleteDocument(selectedDocument.id)
-      loadDocuments()
-      setIsDeleteDialogOpen(false)
-      setSelectedDocument(null)
+    if (!file) return
+    setIsUploading(true)
+    setUploadError(null)
+    try {
+      await uploadDocument(file, description, knowledgeBase)
+      await load()
+      setIsUploadOpen(false)
+    } catch {
+      setUploadError('Erro ao enviar o documento. Verifique o tipo e tamanho do arquivo.')
+    } finally {
+      setIsUploading(false)
     }
   }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      setFormData({
-        ...formData,
-        fileName: file.name,
-        fileType: file.type || 'application/octet-stream',
-        fileSize: file.size,
-        name: formData.name || file.name.replace(/\.[^/.]+$/, ''),
-      })
+  const handleDelete = async () => {
+    if (!selected) return
+    try {
+      await deleteDocument(selected.id)
+      await load()
+    } catch {
+      setError('Erro ao excluir o documento.')
+    } finally {
+      setIsDeleteOpen(false)
+      setSelected(null)
     }
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            Documentos
-          </h1>
-          <p className="text-muted-foreground">
-            Gerencie os documentos disponíveis para download
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Documentos</h1>
+          <p className="text-muted-foreground">Gerencie os documentos e a base de conhecimento da IA</p>
         </div>
-        <Button onClick={() => handleOpenDialog()} className="bg-accent text-accent-foreground hover:bg-accent/90">
+        <Button onClick={handleOpenUpload} className="bg-accent text-accent-foreground hover:bg-accent/90">
           <Plus className="mr-2 h-4 w-4" />
-          Novo Documento
+          Enviar Documento
         </Button>
       </div>
 
-      {/* Search */}
-      <div className="flex items-center gap-4">
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
         <div className="relative max-w-sm flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -179,213 +132,150 @@ export default function AdminDocumentosPage() {
             className="pl-10"
           />
         </div>
-        <Badge variant="outline">{filteredDocuments.length} documento(s)</Badge>
+        <Badge variant="outline">{filtered.length} documento(s)</Badge>
       </div>
 
-      {/* Table */}
       <div className="overflow-x-auto rounded-lg border border-border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Nome</TableHead>
-              <TableHead className="hidden sm:table-cell">Acesso</TableHead>
-              <TableHead className="hidden sm:table-cell">Nível Mín.</TableHead>
+              <TableHead>Arquivo</TableHead>
+              <TableHead className="hidden sm:table-cell">Tamanho</TableHead>
+              <TableHead className="hidden sm:table-cell">Enviado por</TableHead>
               <TableHead className="hidden md:table-cell">Base IA</TableHead>
-              <TableHead className="hidden md:table-cell">Enviado por</TableHead>
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredDocuments.length === 0 ? (
+            {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-8 text-center">
+                <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">Carregando...</TableCell>
+              </TableRow>
+            ) : filtered.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="py-8 text-center">
                   <FileText className="mx-auto h-12 w-12 text-muted-foreground/50" />
-                  <p className="mt-2 text-muted-foreground">
-                    Nenhum documento encontrado.
-                  </p>
+                  <p className="mt-2 text-muted-foreground">Nenhum documento encontrado.</p>
                 </TableCell>
               </TableRow>
-            ) : (
-              filteredDocuments.map((doc) => (
-                <TableRow key={doc.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent/10">
-                        <FileText className="h-5 w-5 text-accent" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="truncate font-medium">{doc.name}</p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {doc.fileName}
-                        </p>
-                      </div>
+            ) : filtered.map((doc) => (
+              <TableRow key={doc.id}>
+                <TableCell>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent/10">
+                      <FileText className="h-5 w-5 text-accent" />
                     </div>
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell">
-                    {doc.isPublic ? (
-                      <Badge variant="outline" className="border-green-500 text-green-600">
-                        <Unlock className="mr-1 h-3 w-3" />
-                        Público
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="border-orange-500 text-orange-600">
-                        <Lock className="mr-1 h-3 w-3" />
-                        Restrito
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell">
-                    <Badge variant="secondary">Nível {doc.minAccessLevel}</Badge>
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    {doc.isKnowledgeBase ? (
-                      <Badge className="bg-purple-100 text-purple-800">
-                        <Brain className="mr-1 h-3 w-3" />
-                        Sim
-                      </Badge>
-                    ) : (
-                      <span className="text-muted-foreground">Não</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell text-muted-foreground">
-                    {doc.uploadedBy}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleOpenDialog(doc)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setSelectedDocument(doc)
-                          setIsDeleteDialogOpen(true)
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{doc.fileName}</p>
+                      {doc.description && (
+                        <p className="truncate text-xs text-muted-foreground">{doc.description}</p>
+                      )}
                     </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
+                  </div>
+                </TableCell>
+                <TableCell className="hidden sm:table-cell text-muted-foreground">
+                  {formatBytes(doc.fileSize)}
+                </TableCell>
+                <TableCell className="hidden sm:table-cell text-muted-foreground">
+                  {doc.username}
+                </TableCell>
+                <TableCell className="hidden md:table-cell">
+                  {doc.knowledgeBase ? (
+                    <Badge className="bg-purple-100 text-purple-800">
+                      <Brain className="mr-1 h-3 w-3" />
+                      Sim
+                    </Badge>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">Não</span>
+                  )}
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex justify-end gap-2">
+                    <Button variant="ghost" size="icon" asChild>
+                      <a href={doc.bucketUrl} target="_blank" rel="noopener noreferrer" aria-label="Baixar">
+                        <Download className="h-4 w-4" />
+                      </a>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => { setSelected(doc); setIsDeleteOpen(true) }}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
           </TableBody>
         </Table>
       </div>
 
-      {/* Create/Edit Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      {/* Upload Dialog */}
+      <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>
-              {selectedDocument ? 'Editar Documento' : 'Novo Documento'}
-            </DialogTitle>
+            <DialogTitle>Enviar Documento</DialogTitle>
             <DialogDescription>
-              {selectedDocument
-                ? 'Atualize as informações do documento.'
-                : 'Preencha as informações do novo documento.'}
+              Tipos aceitos: PDF, Word, Excel, imagens e texto. Máximo 50 MB.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleUpload} className="space-y-4">
+            {uploadError && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{uploadError}</AlertDescription>
+              </Alert>
+            )}
+
             <div className="space-y-2">
-              <Label htmlFor="file">Arquivo</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="file"
-                  type="file"
-                  onChange={handleFileChange}
-                  className="flex-1"
-                />
-              </div>
-              {formData.fileName && (
+              <Label htmlFor="file">Arquivo *</Label>
+              <Input
+                id="file"
+                type="file"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.png,.jpg,.jpeg"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                required
+              />
+              {file && (
                 <p className="text-xs text-muted-foreground">
-                  <Upload className="mr-1 inline h-3 w-3" />
-                  {formData.fileName}
+                  {file.name} · {formatBytes(file.size)}
                 </p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="name">Nome do Documento</Label>
+              <Label htmlFor="description">Descrição (opcional)</Label>
               <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                placeholder="Ex: Manual do Aluno 2024"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="minAccessLevel">Nível de Acesso Mínimo</Label>
-              <Select
-                value={formData.minAccessLevel.toString()}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, minAccessLevel: parseInt(value) })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((level) => (
-                    <SelectItem key={level} value={level.toString()}>
-                      Nível {level}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-center justify-between rounded-lg border border-border p-3">
-              <div className="space-y-0.5">
-                <Label htmlFor="isPublic">Acesso Público</Label>
-                <p className="text-xs text-muted-foreground">
-                  Disponível para todos os visitantes
-                </p>
-              </div>
-              <Switch
-                id="isPublic"
-                checked={formData.isPublic}
-                onCheckedChange={(checked) =>
-                  setFormData({ ...formData, isPublic: checked })
-                }
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Descreva o conteúdo do documento"
               />
             </div>
 
             <div className="flex items-center justify-between rounded-lg border border-border p-3">
               <div className="space-y-0.5">
-                <Label htmlFor="isKnowledgeBase">Base de Conhecimento IA</Label>
-                <p className="text-xs text-muted-foreground">
-                  Usar como referência para o chatbot
-                </p>
+                <Label htmlFor="knowledgeBase">Base de Conhecimento IA</Label>
+                <p className="text-xs text-muted-foreground">Usar como referência para o chatbot</p>
               </div>
               <Switch
-                id="isKnowledgeBase"
-                checked={formData.isKnowledgeBase}
-                onCheckedChange={(checked) =>
-                  setFormData({ ...formData, isKnowledgeBase: checked })
-                }
+                id="knowledgeBase"
+                checked={knowledgeBase}
+                onCheckedChange={setKnowledgeBase}
               />
             </div>
 
             <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsDialogOpen(false)}
-              >
+              <Button type="button" variant="outline" onClick={() => setIsUploadOpen(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" className="bg-accent text-accent-foreground hover:bg-accent/90">
-                {selectedDocument ? 'Salvar' : 'Criar'}
+              <Button
+                type="submit"
+                disabled={isUploading || !file}
+                className="bg-accent text-accent-foreground hover:bg-accent/90"
+              >
+                {isUploading ? 'Enviando...' : 'Enviar'}
               </Button>
             </DialogFooter>
           </form>
@@ -393,13 +283,12 @@ export default function AdminDocumentosPage() {
       </Dialog>
 
       {/* Delete Confirmation */}
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+      <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir o documento &quot;{selectedDocument?.name}&quot;?
-              Esta ação não pode ser desfeita.
+              Tem certeza que deseja excluir &quot;{selected?.fileName}&quot;? O arquivo será removido do S3 e esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

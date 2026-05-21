@@ -20,18 +20,18 @@ const mockCategories: NoticeCategoryResponse[] = [
 describe('getNoticeCategories', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('calls GET /api/notice-categories with the provided token', async () => {
+  it('calls GET /api/notice-categories', async () => {
     vi.mocked(apiClient.get).mockResolvedValue(mockCategories)
 
-    await getNoticeCategories('my-token')
+    await getNoticeCategories()
 
-    expect(apiClient.get).toHaveBeenCalledWith('/api/notice-categories', 'my-token')
+    expect(apiClient.get).toHaveBeenCalledWith('/api/notice-categories')
   })
 
   it('returns the list of categories', async () => {
     vi.mocked(apiClient.get).mockResolvedValue(mockCategories)
 
-    const result = await getNoticeCategories('my-token')
+    const result = await getNoticeCategories()
 
     expect(result).toEqual(mockCategories)
   })
@@ -39,6 +39,6 @@ describe('getNoticeCategories', () => {
   it('propagates ApiError on 401', async () => {
     vi.mocked(apiClient.get).mockRejectedValue(new ApiError(401, 'Unauthorized'))
 
-    await expect(getNoticeCategories('bad-token')).rejects.toThrow(ApiError)
+    await expect(getNoticeCategories()).rejects.toThrow(ApiError)
   })
 })

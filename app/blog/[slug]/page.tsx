@@ -40,7 +40,7 @@ export default function PostPage() {
   const params = useParams()
   const router = useRouter()
   const id = Number(params.slug)
-  const { token, canAccessUiItem } = useAuth()
+  const { canAccessUiItem } = useAuth()
   const canEdit = canAccessUiItem('admin_blog_post')
 
   const [post, setPost] = useState<NoticeResponse | null>(null)
@@ -71,15 +71,15 @@ export default function PostPage() {
       coverImgUrl: post.coverImgUrl ?? '',
     })
     setSaveError(null)
-    if (token && categories.length === 0) {
-      getNoticeCategories(token).then(setCategories).catch(() => {})
+    if (categories.length === 0) {
+      getNoticeCategories().then(setCategories).catch(() => {})
     }
     setIsEditOpen(true)
   }
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!token || !post) return
+    if (!post) return
 
     const previousPost = post
     const categoryName =
@@ -98,16 +98,12 @@ export default function PostPage() {
     setSaveError(null)
 
     try {
-      const updated = await updateNotice(
-        post.id,
-        {
-          title: editForm.title,
-          markdownContent: editForm.markdownContent,
-          categoryId: Number(editForm.categoryId),
-          coverImgUrl: editForm.coverImgUrl.trim() || undefined,
-        },
-        token,
-      )
+      const updated = await updateNotice(post.id, {
+        title: editForm.title,
+        markdownContent: editForm.markdownContent,
+        categoryId: Number(editForm.categoryId),
+        coverImgUrl: editForm.coverImgUrl.trim() || undefined,
+      })
       setPost(updated)
     } catch {
       setPost(previousPost)
@@ -143,7 +139,7 @@ export default function PostPage() {
           </div>
         )}
 
-        <article className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
           {/* Nav row: back button left, edit button right */}
           <div className="mb-8 flex items-center justify-between">
             <Button variant="outline" onClick={() => router.back()}>
@@ -162,55 +158,57 @@ export default function PostPage() {
             )}
           </div>
 
-          <header className="mb-8">
-            {post!.categoryName && (
-              <Badge variant="secondary" className="mb-4 gap-1">
-                <Tag className="h-3 w-3" />
-                {post!.categoryName}
-              </Badge>
-            )}
+          <article>
+            <header className="mb-8">
+              {post!.categoryName && (
+                <Badge variant="secondary" className="mb-4 gap-1">
+                  <Tag className="h-3 w-3" />
+                  {post!.categoryName}
+                </Badge>
+              )}
 
-            <h1 className="mb-6 text-3xl font-bold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
-              {post!.title}
-            </h1>
+              <h1 className="mb-6 text-3xl font-bold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
+                {post!.title}
+              </h1>
 
-            <div className="flex flex-wrap items-center gap-4 border-b border-border pb-6 text-sm text-muted-foreground">
-              <span className="flex items-center gap-1.5">
-                <User className="h-4 w-4" />
-                {post!.username}
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Calendar className="h-4 w-4" />
-                {new Date(post!.createdAt).toLocaleDateString('pt-BR', {
-                  day: 'numeric',
-                  month: 'long',
-                  year: 'numeric',
-                })}
-              </span>
+              <div className="flex flex-wrap items-center gap-4 border-b border-border pb-6 text-sm text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <User className="h-4 w-4" />
+                  {post!.username}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Calendar className="h-4 w-4" />
+                  {new Date(post!.createdAt).toLocaleDateString('pt-BR', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric',
+                  })}
+                </span>
+              </div>
+            </header>
+
+            <div className="prose prose-neutral max-w-none dark:prose-invert">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  img({ src, alt }) {
+                    if (!src) return null
+                    return (
+                      <img
+                        src={src}
+                        alt={alt ?? ''}
+                        className="my-6 max-w-full rounded-lg"
+                        loading="lazy"
+                      />
+                    )
+                  },
+                }}
+              >
+                {post!.markdownContent}
+              </ReactMarkdown>
             </div>
-          </header>
-
-          <div className="prose max-w-none">
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              components={{
-                img({ src, alt }) {
-                  if (!src) return null
-                  return (
-                    <img
-                      src={src}
-                      alt={alt ?? ''}
-                      className="my-6 max-w-full rounded-lg"
-                      loading="lazy"
-                    />
-                  )
-                },
-              }}
-            >
-              {post!.markdownContent}
-            </ReactMarkdown>
-          </div>
-        </article>
+          </article>
+        </div>
       </main>
 
       <Footer />

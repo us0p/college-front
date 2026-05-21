@@ -43,7 +43,7 @@ import {
 import type { NoticeCategoryResponse } from '@/lib/api/types'
 
 export default function AdminCategoriasPage() {
-  const { token, canAccessUiItem } = useAuth()
+  const { canAccessUiItem } = useAuth()
   const canAccess = canAccessUiItem('admin_notice_categories')
 
   const [categories, setCategories] = useState<NoticeCategoryResponse[]>([])
@@ -58,18 +58,17 @@ export default function AdminCategoriasPage() {
   const [formError, setFormError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    if (!token) return
     setIsLoading(true)
     setError(null)
     try {
-      const data = await getNoticeCategories(token)
+      const data = await getNoticeCategories()
       setCategories(data.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')))
     } catch {
       setError('Não foi possível carregar as categorias.')
     } finally {
       setIsLoading(false)
     }
-  }, [token])
+  }, [])
 
   useEffect(() => { load() }, [load])
 
@@ -100,14 +99,13 @@ export default function AdminCategoriasPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!token) return
     setIsSaving(true)
     setFormError(null)
     try {
       if (selected) {
-        await updateNoticeCategory(selected.id, { name: name.trim() }, token)
+        await updateNoticeCategory(selected.id, { name: name.trim() })
       } else {
-        await createNoticeCategory({ name: name.trim() }, token)
+        await createNoticeCategory({ name: name.trim() })
       }
       await load()
       setIsDialogOpen(false)
@@ -119,9 +117,9 @@ export default function AdminCategoriasPage() {
   }
 
   const handleDelete = async () => {
-    if (!selected || !token) return
+    if (!selected) return
     try {
-      await deleteNoticeCategory(selected.id, token)
+      await deleteNoticeCategory(selected.id)
       await load()
     } catch {
       setError('Erro ao excluir a categoria.')
@@ -216,7 +214,6 @@ export default function AdminCategoriasPage() {
         </Table>
       </div>
 
-      {/* Total */}
       {!isLoading && categories.length > 0 && (
         <p className="text-sm text-muted-foreground">{categories.length} categoria(s)</p>
       )}

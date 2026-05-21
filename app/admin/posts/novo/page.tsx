@@ -25,7 +25,7 @@ import type { NoticeCategoryResponse } from '@/lib/api/types'
 
 export default function NovoAvisoPage() {
   const router = useRouter()
-  const { token, user } = useAuth()
+  const { user } = useAuth()
 
   const [title, setTitle] = useState('')
   const [markdownContent, setMarkdownContent] = useState('')
@@ -36,28 +36,23 @@ export default function NovoAvisoPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (token) {
-      getNoticeCategories(token).then(setCategories).catch(() => {})
-    }
-  }, [token])
+    getNoticeCategories().then(setCategories).catch(() => {})
+  }, [])
 
   const selectedCategory = categories.find((c) => c.id.toString() === categoryId)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!token || !user) return
+    if (!user) return
     setIsSaving(true)
     setError(null)
     try {
-      await createNotice(
-        {
-          title,
-          markdownContent,
-          categoryId: Number(categoryId),
-          coverImgUrl: coverImgUrl.trim() || undefined,
-        },
-        token,
-      )
+      await createNotice({
+        title,
+        markdownContent,
+        categoryId: Number(categoryId),
+        coverImgUrl: coverImgUrl.trim() || undefined,
+      })
       router.push('/admin/posts')
     } catch {
       setError('Erro ao publicar o aviso. Tente novamente.')

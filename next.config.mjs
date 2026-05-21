@@ -1,4 +1,7 @@
 /** @type {import('next').NextConfig} */
+const isDev = process.env.NODE_ENV === 'development'
+const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
+
 const nextConfig = {
   typescript: {
     ignoreBuildErrors: false,
@@ -7,22 +10,27 @@ const nextConfig = {
     unoptimized: true,
   },
   async headers() {
+    const scriptSrc = isDev
+      ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+      : "script-src 'self' 'unsafe-inline'"
+
     return [
       {
         source: '/(.*)',
         headers: [
-          { key: 'X-Content-Type-Options', value: 'nosniff' },
-          { key: 'X-Frame-Options',        value: 'DENY' },
-          { key: 'Referrer-Policy',        value: 'strict-origin-when-cross-origin' },
+          { key: 'X-Content-Type-Options',    value: 'nosniff' },
+          { key: 'X-Frame-Options',            value: 'DENY' },
+          { key: 'Referrer-Policy',            value: 'strict-origin-when-cross-origin' },
+          { key: 'Strict-Transport-Security',  value: 'max-age=31536000; includeSubDomains' },
           {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",  // Next.js requires unsafe-eval in dev
+              scriptSrc,
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: https:",
               "font-src 'self'",
-              "connect-src 'self' http://localhost:8080",
+              `connect-src 'self' ${apiUrl}`,
             ].join('; '),
           },
         ],

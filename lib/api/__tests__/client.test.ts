@@ -49,26 +49,14 @@ describe('createApiClient', () => {
       )
     })
 
-    it('omits Authorization header when no token given', async () => {
+    it('uses cookie-based auth (no Authorization header)', async () => {
       mockFetch.mockResolvedValue(makeResponse({}))
 
       await client.get('/api/posts')
 
       const [, options] = mockFetch.mock.calls[0] as [string, RequestInit]
       expect((options.headers as Record<string, string>)['Authorization']).toBeUndefined()
-    })
-
-    it('sets Authorization Bearer header when token given', async () => {
-      mockFetch.mockResolvedValue(makeResponse({}))
-
-      await client.get('/api/users', 'my-jwt')
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({
-          headers: expect.objectContaining({ Authorization: 'Bearer my-jwt' }),
-        }),
-      )
+      expect(options.credentials).toBe('include')
     })
 
     it('returns parsed JSON body', async () => {
@@ -83,7 +71,7 @@ describe('createApiClient', () => {
     it('throws ApiError with status 401 on Unauthorized', async () => {
       mockFetch.mockResolvedValue(makeResponse({ message: 'Unauthorized' }, 401))
 
-      const err = await client.get('/api/users', 'bad').catch((e) => e)
+      const err = await client.get('/api/users').catch((e) => e)
 
       expect(err).toBeInstanceOf(ApiError)
       expect(err.status).toBe(401)
@@ -98,10 +86,10 @@ describe('createApiClient', () => {
       expect(err.status).toBe(500)
     })
 
-    it('uses message from response body in ApiError', async () => {
-      mockFetch.mockResolvedValue(makeResponse({ message: 'Token expired' }, 401))
+    it('uses detail from response body in ApiError', async () => {
+      mockFetch.mockResolvedValue(makeResponse({ detail: 'Token expired' }, 401))
 
-      const err = await client.get('/api/users', 'old').catch((e) => e)
+      const err = await client.get('/api/users').catch((e) => e)
 
       expect(err.message).toBe('Token expired')
     })
@@ -109,7 +97,7 @@ describe('createApiClient', () => {
 
   describe('post', () => {
     it('sends POST with serialized JSON body', async () => {
-      mockFetch.mockResolvedValue(makeResponse({ token: 'jwt' }))
+      mockFetch.mockResolvedValue(makeResponse({ userId: 1 }))
       const body = { username: 'admin', password: 'secret' }
 
       await client.post('/api/auth/login', body)
@@ -120,19 +108,6 @@ describe('createApiClient', () => {
           method: 'POST',
           body: JSON.stringify(body),
           headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
-        }),
-      )
-    })
-
-    it('attaches Authorization header when token given', async () => {
-      mockFetch.mockResolvedValue(makeResponse({ id: 1 }))
-
-      await client.post('/api/posts', { title: 'Test' }, 'my-token')
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({
-          headers: expect.objectContaining({ Authorization: 'Bearer my-token' }),
         }),
       )
     })
@@ -151,7 +126,7 @@ describe('createApiClient', () => {
     it('sends PUT with serialized JSON body', async () => {
       mockFetch.mockResolvedValue(makeResponse({ id: 1 }))
 
-      await client.put('/api/users/1', { username: 'updated' }, 'token')
+      await client.put('/api/users/1', { username: 'updated' })
 
       expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:8080/api/users/1',
@@ -171,7 +146,7 @@ describe('createApiClient', () => {
         json: () => Promise.resolve(null),
       } as unknown as Response)
 
-      const result = await client.delete('/api/users/1', 'token')
+      const result = await client.delete('/api/users/1')
 
       expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:8080/api/users/1',
@@ -187,10 +162,10 @@ describe('createApiClient', () => {
       const formData = new FormData()
       formData.append('file', new Blob(['content']), 'test.pdf')
 
-      await client.postFormData('/api/documents', formData, { userId: '1' }, 'token')
+      await client.postFormData('/api/documents', formData, { userId: '1' })
 
       const [, options] = mockFetch.mock.calls[0] as [string, RequestInit]
-      expect((options.headers as Record<string, string>)['Content-Type']).toBeUndefined()
+      expect((options.headers as Record<string, string> | undefined)?.['Content-Type']).toBeUndefined()
       expect(options.body).toBeInstanceOf(FormData)
     })
 
@@ -198,20 +173,11 @@ describe('createApiClient', () => {
       mockFetch.mockResolvedValue(makeResponse({ id: 1 }))
       const formData = new FormData()
 
-      await client.postFormData('/api/documents', formData, { userId: '5', knowledgeBase: 'true' }, 'token')
+      await client.postFormData('/api/documents', formData, { userId: '5', knowledgeBase: 'true' })
 
       const [url] = mockFetch.mock.calls[0] as [string]
       expect(url).toContain('userId=5')
       expect(url).toContain('knowledgeBase=true')
-    })
-
-    it('sets Authorization header', async () => {
-      mockFetch.mockResolvedValue(makeResponse({ id: 1 }))
-
-      await client.postFormData('/api/documents', new FormData(), {}, 'my-token')
-
-      const [, options] = mockFetch.mock.calls[0] as [string, RequestInit]
-      expect((options.headers as Record<string, string>)['Authorization']).toBe('Bearer my-token')
     })
   })
 })

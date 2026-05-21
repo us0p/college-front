@@ -15,7 +15,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
     let message = response.statusText
     try {
       const body = await response.json()
-      message = body.message ?? body.error ?? message
+      message = body.message ?? body.detail ?? body.error ?? message
     } catch {
       // keep statusText if body isn't JSON
     }
@@ -27,23 +27,14 @@ async function handleResponse<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>
 }
 
-function buildHeaders(token?: string): Record<string, string> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (token) headers['Authorization'] = `Bearer ${token}`
-  return headers
-}
+const headers = { 'Content-Type': 'application/json' }
 
 export interface ApiClient {
-  get<T>(path: string, token?: string): Promise<T>
-  post<T>(path: string, body: unknown, token?: string): Promise<T>
-  put<T>(path: string, body: unknown, token?: string): Promise<T>
-  delete(path: string, token?: string): Promise<void>
-  postFormData<T>(
-    path: string,
-    formData: FormData,
-    params?: Record<string, string>,
-    token?: string,
-  ): Promise<T>
+  get<T>(path: string): Promise<T>
+  post<T>(path: string, body: unknown): Promise<T>
+  put<T>(path: string, body: unknown): Promise<T>
+  delete(path: string): Promise<void>
+  postFormData<T>(path: string, formData: FormData, params?: Record<string, string>): Promise<T>
 }
 
 export function createApiClient(baseUrl: string): ApiClient {
@@ -56,51 +47,43 @@ export function createApiClient(baseUrl: string): ApiClient {
   }
 
   return {
-    get<T>(path: string, token?: string): Promise<T> {
+    get<T>(path: string): Promise<T> {
       return fetch(buildUrl(path), {
         method: 'GET',
-        headers: buildHeaders(token),
+        headers,
         credentials: 'include',
       }).then(handleResponse<T>)
     },
 
-    post<T>(path: string, body: unknown, token?: string): Promise<T> {
+    post<T>(path: string, body: unknown): Promise<T> {
       return fetch(buildUrl(path), {
         method: 'POST',
-        headers: buildHeaders(token),
+        headers,
         body: JSON.stringify(body),
         credentials: 'include',
       }).then(handleResponse<T>)
     },
 
-    put<T>(path: string, body: unknown, token?: string): Promise<T> {
+    put<T>(path: string, body: unknown): Promise<T> {
       return fetch(buildUrl(path), {
         method: 'PUT',
-        headers: buildHeaders(token),
+        headers,
         body: JSON.stringify(body),
         credentials: 'include',
       }).then(handleResponse<T>)
     },
 
-    delete(path: string, token?: string): Promise<void> {
+    delete(path: string): Promise<void> {
       return fetch(buildUrl(path), {
         method: 'DELETE',
-        headers: buildHeaders(token),
+        headers,
         credentials: 'include',
       }).then(handleResponse<void>)
     },
 
-    postFormData<T>(
-      path: string,
-      formData: FormData,
-      params?: Record<string, string>,
-      token?: string,
-    ): Promise<T> {
-      const headers: Record<string, string> = {}
-      if (token) headers['Authorization'] = `Bearer ${token}`
+    postFormData<T>(path: string, formData: FormData, params?: Record<string, string>): Promise<T> {
       return fetch(buildUrl(path, params), {
         method: 'POST',
-        headers,
         body: formData,
         credentials: 'include',
       }).then(handleResponse<T>)

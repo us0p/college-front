@@ -60,7 +60,7 @@ const emptyForm: FormData = { title: '', markdownContent: '', categoryId: '', co
 
 export default function AdminPostsPage() {
   const router = useRouter()
-  const { token } = useAuth()
+  
   const [posts, setPosts] = useState<NoticeResponse[]>([])
   const [categories, setCategories] = useState<NoticeCategoryResponse[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -96,12 +96,10 @@ export default function AdminPostsPage() {
   // Initial load
   useEffect(() => {
     loadPosts('', 0)
-    if (token) {
-      getNoticeCategories(token)
-        .then(setCategories)
-        .catch(() => setError('Não foi possível carregar as categorias.'))
-    }
-  }, [loadPosts, token])
+    getNoticeCategories()
+      .then(setCategories)
+      .catch(() => setError('Não foi possível carregar as categorias.'))
+  }, [loadPosts])
 
   // Debounced search — resets to page 0
   const handleSearchChange = (value: string) => {
@@ -132,13 +130,13 @@ export default function AdminPostsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!token || !selectedPost) return
+    if (!selectedPost) return
     setIsSaving(true)
     setFormError(null)
     try {
       const categoryId = Number(formData.categoryId)
       const coverImgUrl = formData.coverImgUrl.trim() || undefined
-      await updateNotice(selectedPost.id, { title: formData.title, markdownContent: formData.markdownContent, categoryId, coverImgUrl }, token)
+      await updateNotice(selectedPost.id, { title: formData.title, markdownContent: formData.markdownContent, categoryId, coverImgUrl })
       await loadPosts(searchQuery, currentPage)
       setIsDialogOpen(false)
     } catch {
@@ -149,9 +147,9 @@ export default function AdminPostsPage() {
   }
 
   const handleDelete = async () => {
-    if (!selectedPost || !token) return
+    if (!selectedPost) return
     try {
-      await deleteNotice(selectedPost.id, token)
+      await deleteNotice(selectedPost.id)
       const newPage = posts.length === 1 && currentPage > 0 ? currentPage - 1 : currentPage
       setCurrentPage(newPage)
       await loadPosts(searchQuery, newPage)

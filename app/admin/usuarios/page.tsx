@@ -1,422 +1,278 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import {
-  Plus,
-  Pencil,
-  Trash2,
-  Users,
-  Search,
-  Shield,
-  Mail,
-  Phone,
+  Plus, Pencil, Trash2, Users, Search, Shield, Mail, Phone,
+  AlertCircle, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import { Switch } from '@/components/ui/switch'
-import {
-  getUsers,
-  getGroups,
-  saveUser,
-  deleteUser,
-  initializeStorage,
-} from '@/lib/storage'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { useAuth } from '@/hooks/use-auth'
-import type { User, AccessGroup } from '@/lib/types'
+import { getUsers, createUser, updateUser, deleteUser } from '@/lib/api/users'
+import { getRoles } from '@/lib/api/roles'
+import type { UserResponse, RoleResponse } from '@/lib/api/types'
+import { DEBOUNCE_MS, PAGE_SIZE } from '@/lib/constants'
 
-const emptyUser: Omit<User, 'id' | 'createdAt'> = {
-  username: '',
-  email: '',
-  password: '',
-  phone: '',
-  groupId: '',
-  isAdmin: false,
-}
+const emptyForm = { username: '', email: '', phoneNumber: '', roleId: '' as string | number, ra: '' }
 
 export default function AdminUsuariosPage() {
   const { user: currentUser } = useAuth()
-  const [users, setUsers] = useState<User[]>([])
-  const [groups, setGroups] = useState<AccessGroup[]>([])
+
+  const [users, setUsers] = useState<UserResponse[]>([])
+  const [roles, setRoles] = useState<RoleResponse[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [currentPage, setCurrentPage] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+  const [totalElements, setTotalElements] = useState(0)
+
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
-  const [selectedUser, setSelectedUser] = useState<User | null>(null)
-  const [formData, setFormData] =
-    useState<Omit<User, 'id' | 'createdAt'>>(emptyUser)
+  const [selected, setSelected] = useState<UserResponse | null>(null)
+  const [formData, setFormData] = useState(emptyForm)
+  const [isSaving, setIsSaving] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
 
-  useEffect(() => {
-    initializeStorage()
-    loadData()
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const load = useCallback(async (search: string, page: number) => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const data = await getUsers({ searchParam: search || undefined, page, size: PAGE_SIZE })
+      setUsers(data.content ?? [])
+      setTotalPages(data.totalPages ?? 0)
+      setTotalElements(data.totalElements ?? 0)
+    } catch {
+      setError('Não foi possível carregar os usuários.')
+    } finally {
+      setIsLoading(false)
+    }
   }, [])
 
-  const loadData = () => {
-    setUsers(getUsers())
-    setGroups(getGroups())
+  useEffect(() => {
+    load('', 0)
+    getRoles({ size: 100 })
+      .then((data) => setRoles(data.content ?? []))
+      .catch(() => {})
+  }, [load])
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value)
+    if (debounceTimer.current) clearTimeout(debounceTimer.current)
+    debounceTimer.current = setTimeout(() => { setCurrentPage(0); load(value, 0) }, DEBOUNCE_MS)
   }
 
-  const filteredUsers = users.filter(
-    (user) =>
-      user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const handlePageChange = (page: number) => { setCurrentPage(page); load(searchQuery, page) }
 
-  const getGroupName = (groupId: string) => {
-    const group = groups.find((g) => g.id === groupId)
-    return group?.name || 'Sem grupo'
-  }
-
-  const handleOpenDialog = (user?: User) => {
-    if (user) {
-      setSelectedUser(user)
-      setFormData({
-        username: user.username,
-        email: user.email,
-        password: user.password,
-        phone: user.phone || '',
-        groupId: user.groupId,
-        isAdmin: user.isAdmin,
-      })
-    } else {
-      setSelectedUser(null)
-      setFormData(emptyUser)
-    }
+  const handleOpenDialog = (user?: UserResponse) => {
+    setFormError(null)
+    setSelected(user ?? null)
+    setFormData(user
+      ? { username: user.username, email: user.email, phoneNumber: user.phoneNumber ?? '', roleId: user.roleId, ra: user.ra ?? '' }
+      : emptyForm)
     setIsDialogOpen(true)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
-    const userToSave: User = {
-      id: selectedUser?.id || `user-${Date.now()}`,
-      ...formData,
-      createdAt: selectedUser?.createdAt || new Date().toISOString(),
+    setIsSaving(true)
+    setFormError(null)
+    const payload = {
+      username: formData.username,
+      email: formData.email,
+      phoneNumber: formData.phoneNumber || undefined,
+      roleId: Number(formData.roleId),
+      ra: formData.ra || undefined,
     }
-
-    saveUser(userToSave)
-    loadData()
-    setIsDialogOpen(false)
+    try {
+      if (selected) {
+        await updateUser(selected.id, payload)
+      } else {
+        await createUser(payload)
+      }
+      await load(searchQuery, currentPage)
+      setIsDialogOpen(false)
+    } catch {
+      setFormError(selected ? 'Erro ao atualizar o usuário.' : 'Erro ao criar o usuário.')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
-  const handleDelete = () => {
-    if (selectedUser && selectedUser.id !== currentUser?.id) {
-      deleteUser(selectedUser.id)
-      loadData()
+  const handleDelete = async () => {
+    if (!selected) return
+    try {
+      await deleteUser(selected.id)
+      const newPage = users.length === 1 && currentPage > 0 ? currentPage - 1 : currentPage
+      setCurrentPage(newPage)
+      await load(searchQuery, newPage)
+    } catch {
+      setError('Erro ao excluir o usuário.')
+    } finally {
       setIsDeleteDialogOpen(false)
-      setSelectedUser(null)
+      setSelected(null)
     }
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            Usuários
-          </h1>
-          <p className="text-muted-foreground">
-            Gerencie os usuários e suas permissões
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Usuários</h1>
+          <p className="text-muted-foreground">Gerencie os usuários e suas permissões</p>
         </div>
         <Button onClick={() => handleOpenDialog()} className="bg-accent text-accent-foreground hover:bg-accent/90">
-          <Plus className="mr-2 h-4 w-4" />
-          Novo Usuário
+          <Plus className="mr-2 h-4 w-4" />Novo Usuário
         </Button>
       </div>
 
-      {/* Search */}
-      <div className="flex items-center gap-4">
+      {error && (
+        <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert>
+      )}
+
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
         <div className="relative max-w-sm flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            type="text"
-            placeholder="Buscar por nome ou email..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
+          <Input type="text" placeholder="Buscar por email, telefone ou papel..." value={searchQuery}
+            onChange={(e) => handleSearchChange(e.target.value)} className="pl-10" />
         </div>
-        <Badge variant="outline">{filteredUsers.length} usuário(s)</Badge>
+        <Badge variant="outline">{totalElements} usuário(s)</Badge>
       </div>
 
-      {/* Table */}
       <div className="overflow-x-auto rounded-lg border border-border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Usuário</TableHead>
               <TableHead className="hidden sm:table-cell">Contato</TableHead>
-              <TableHead className="hidden sm:table-cell">Grupo</TableHead>
-              <TableHead className="hidden md:table-cell">Admin</TableHead>
-              <TableHead className="hidden md:table-cell">Criado em</TableHead>
+              <TableHead className="hidden sm:table-cell">Papel</TableHead>
+              <TableHead className="hidden md:table-cell">RA</TableHead>
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredUsers.length === 0 ? (
+            {isLoading ? (
+              <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">Carregando...</TableCell></TableRow>
+            ) : users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-8 text-center">
+                <TableCell colSpan={5} className="py-8 text-center">
                   <Users className="mx-auto h-12 w-12 text-muted-foreground/50" />
-                  <p className="mt-2 text-muted-foreground">
-                    Nenhum usuário encontrado.
-                  </p>
+                  <p className="mt-2 text-muted-foreground">Nenhum usuário encontrado.</p>
                 </TableCell>
               </TableRow>
-            ) : (
-              filteredUsers.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/10 font-semibold text-accent">
-                        {user.username.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="truncate font-medium">{user.username}</p>
-                        {user.id === currentUser?.id && (
-                          <Badge variant="secondary" className="text-xs">
-                            Você
-                          </Badge>
-                        )}
-                      </div>
+            ) : users.map((user) => (
+              <TableRow key={user.id}>
+                <TableCell>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/10 font-semibold text-accent">
+                      {user.username.charAt(0).toUpperCase()}
                     </div>
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell">
-                    <div className="space-y-1">
-                      <p className="flex items-center gap-1 text-sm">
-                        <Mail className="h-3 w-3 text-muted-foreground" />
-                        {user.email}
-                      </p>
-                      {user.phone && (
-                        <p className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <Phone className="h-3 w-3" />
-                          {user.phone}
-                        </p>
-                      )}
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{user.username}</p>
+                      {user.id === currentUser?.id && <Badge variant="secondary" className="text-xs">Você</Badge>}
                     </div>
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell">
-                    <Badge variant="outline">
-                      <Shield className="mr-1 h-3 w-3" />
-                      {getGroupName(user.groupId)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    {user.isAdmin ? (
-                      <Badge className="bg-purple-100 text-purple-800">Sim</Badge>
-                    ) : (
-                      <span className="text-muted-foreground">Não</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell text-muted-foreground">
-                    {new Date(user.createdAt).toLocaleDateString('pt-BR')}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleOpenDialog(user)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setSelectedUser(user)
-                          setIsDeleteDialogOpen(true)
-                        }}
-                        disabled={user.id === currentUser?.id}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
+                  </div>
+                </TableCell>
+                <TableCell className="hidden sm:table-cell">
+                  <div className="space-y-1">
+                    <p className="flex items-center gap-1 text-sm"><Mail className="h-3 w-3 text-muted-foreground" />{user.email}</p>
+                    {user.phoneNumber && <p className="flex items-center gap-1 text-sm text-muted-foreground"><Phone className="h-3 w-3" />{user.phoneNumber}</p>}
+                  </div>
+                </TableCell>
+                <TableCell className="hidden sm:table-cell">
+                  <Badge variant="outline"><Shield className="mr-1 h-3 w-3" />{user.roleName}</Badge>
+                </TableCell>
+                <TableCell className="hidden md:table-cell text-muted-foreground">{user.ra ?? '—'}</TableCell>
+                <TableCell className="text-right">
+                  <div className="flex justify-end gap-2">
+                    <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(user)}><Pencil className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" onClick={() => { setSelected(user); setIsDeleteDialogOpen(true) }}
+                      disabled={user.id === currentUser?.id}>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
           </TableBody>
         </Table>
       </div>
 
-      {/* Create/Edit Dialog */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">Página {currentPage + 1} de {totalPages}</p>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 0 || isLoading}>
+              <ChevronLeft className="h-4 w-4" />Anterior
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage >= totalPages - 1 || isLoading}>
+              Próxima<ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>
-              {selectedUser ? 'Editar Usuário' : 'Novo Usuário'}
-            </DialogTitle>
+            <DialogTitle>{selected ? 'Editar Usuário' : 'Novo Usuário'}</DialogTitle>
             <DialogDescription>
-              {selectedUser
-                ? 'Atualize as informações do usuário.'
-                : 'Preencha as informações do novo usuário.'}
+              {selected ? 'Atualize as informações do usuário.' : 'Preencha as informações do novo usuário. Um e-mail será enviado para o usuário criar sua senha.'}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {formError && <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertDescription>{formError}</AlertDescription></Alert>}
             <div className="space-y-2">
               <Label htmlFor="username">Nome de Usuário</Label>
-              <Input
-                id="username"
-                value={formData.username}
-                onChange={(e) =>
-                  setFormData({ ...formData, username: e.target.value })
-                }
-                placeholder="Ex: joao.silva"
-                required
-              />
+              <Input id="username" value={formData.username} onChange={(e) => setFormData({ ...formData, username: e.target.value })} placeholder="Ex: joao.silva" maxLength={20} required />
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="email">E-mail</Label>
-              <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) =>
-                  setFormData({ ...formData, email: e.target.value })
-                }
-                placeholder="Ex: joao@mural.com"
-                required
-              />
+              <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="Ex: joao@universidade.com" maxLength={254} required />
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password">Senha</Label>
-              <Input
-                id="password"
-                type="password"
-                value={formData.password}
-                onChange={(e) =>
-                  setFormData({ ...formData, password: e.target.value })
-                }
-                placeholder="Digite a senha"
-                required={!selectedUser}
-              />
-              {selectedUser && (
-                <p className="text-xs text-muted-foreground">
-                  Deixe em branco para manter a senha atual
-                </p>
-              )}
-            </div>
-
             <div className="space-y-2">
               <Label htmlFor="phone">Telefone (opcional)</Label>
-              <Input
-                id="phone"
-                value={formData.phone}
-                onChange={(e) =>
-                  setFormData({ ...formData, phone: e.target.value })
-                }
-                placeholder="Ex: (11) 99999-9999"
-              />
+              <Input id="phone" value={formData.phoneNumber} onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })} placeholder="Ex: (11) 99999-9999" maxLength={20} />
             </div>
-
             <div className="space-y-2">
-              <Label htmlFor="groupId">Grupo de Acesso</Label>
-              <Select
-                value={formData.groupId}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, groupId: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um grupo" />
-                </SelectTrigger>
-                <SelectContent>
-                  {groups.map((group) => (
-                    <SelectItem key={group.id} value={group.id}>
-                      {group.name} (Nível {group.level})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
+              <Label htmlFor="ra">RA (opcional)</Label>
+              <Input id="ra" value={formData.ra} onChange={(e) => setFormData({ ...formData, ra: e.target.value })} placeholder="Ex: RA123456" maxLength={10} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="roleId">Papel *</Label>
+              <Select value={String(formData.roleId)} onValueChange={(v) => setFormData({ ...formData, roleId: Number(v) })} required>
+                <SelectTrigger id="roleId"><SelectValue placeholder="Selecione um papel" /></SelectTrigger>
+                <SelectContent>{roles.map((role) => <SelectItem key={role.id} value={String(role.id)}>{role.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-
-            <div className="flex items-center justify-between rounded-lg border border-border p-3">
-              <div className="space-y-0.5">
-                <Label htmlFor="isAdmin">Administrador</Label>
-                <p className="text-xs text-muted-foreground">
-                  Acesso ao painel administrativo
-                </p>
-              </div>
-              <Switch
-                id="isAdmin"
-                checked={formData.isAdmin}
-                onCheckedChange={(checked) =>
-                  setFormData({ ...formData, isAdmin: checked })
-                }
-              />
-            </div>
-
             <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsDialogOpen(false)}
-              >
-                Cancelar
-              </Button>
-              <Button type="submit" className="bg-accent text-accent-foreground hover:bg-accent/90">
-                {selectedUser ? 'Salvar' : 'Criar'}
+              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
+              <Button type="submit" disabled={isSaving || !formData.username.trim() || !formData.email.trim() || !formData.roleId} className="bg-accent text-accent-foreground hover:bg-accent/90">
+                {isSaving ? 'Salvando...' : selected ? 'Salvar' : 'Criar'}
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja excluir o usuário &quot;{selectedUser?.username}&quot;?
-              Esta ação não pode ser desfeita.
-            </AlertDialogDescription>
+            <AlertDialogDescription>Tem certeza que deseja excluir o usuário &quot;{selected?.username}&quot;? Esta ação não pode ser desfeita.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Excluir
-            </AlertDialogAction>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Excluir</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

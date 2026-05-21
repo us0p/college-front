@@ -13,25 +13,21 @@ export function getNotices(params: GetNoticesParams = {}): Promise<NoticePageRes
   if (params.page !== undefined) query.set('page', String(params.page))
   if (params.size !== undefined) query.set('size', String(params.size))
   const qs = query.toString()
-  return apiClient.get<NoticePageResponse>(`/api/notices${qs ? `?${qs}` : ''}`, undefined)
+  return apiClient.get<NoticePageResponse>(`/api/notices${qs ? `?${qs}` : ''}`)
 }
 
 export function getNotice(id: number): Promise<NoticeResponse> {
-  return apiClient.get<NoticeResponse>(`/api/notices/${id}`, undefined)
+  return apiClient.get<NoticeResponse>(`/api/notices/${id}`)
 }
 
-export function createNotice(data: NoticeRequest, token: string): Promise<NoticeResponse> {
-  return apiClient.post<NoticeResponse>('/api/notices', data, token)
+export function createNotice(data: NoticeRequest): Promise<NoticeResponse> {
+  return apiClient.post<NoticeResponse>('/api/notices', data)
 }
 
-export function updateNotice(
-  id: number,
-  data: NoticeUpdateRequest,
-  token: string,
-): Promise<NoticeResponse> {
-  return apiClient.put<NoticeResponse>(`/api/notices/${id}`, data, token)
+export function updateNotice(id: number, data: NoticeUpdateRequest): Promise<NoticeResponse> {
+  return apiClient.put<NoticeResponse>(`/api/notices/${id}`, data)
 }
 
-export function deleteNotice(id: number, token: string): Promise<void> {
-  return apiClient.delete(`/api/notices/${id}`, token)
+export function deleteNotice(id: number): Promise<void> {
+  return apiClient.delete(`/api/notices/${id}`)
 }

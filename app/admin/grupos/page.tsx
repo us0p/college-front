@@ -29,7 +29,7 @@ import type { PermissionObjectResponse, RolePermissionResponse, RoleResponse } f
 import { DEBOUNCE_MS, PAGE_SIZE } from '@/lib/constants'
 
 export default function AdminGruposPage() {
-  const { token } = useAuth()
+  
 
   // ── listing state ────────────────────────────────────────────────────────
   const [roles, setRoles] = useState<RoleResponse[]>([])
@@ -62,11 +62,10 @@ export default function AdminGruposPage() {
 
   // ── load roles list ──────────────────────────────────────────────────────
   const load = useCallback(async (search: string, page: number) => {
-    if (!token) return
     setIsLoading(true)
     setError(null)
     try {
-      const data = await getRoles({ searchParam: search || undefined, page, size: PAGE_SIZE }, token)
+      const data = await getRoles({ searchParam: search || undefined, page, size: PAGE_SIZE })
       const normalised = Array.isArray(data)
         ? { content: data as unknown as RoleResponse[], page: 0, size: (data as unknown as RoleResponse[]).length, totalElements: (data as unknown as RoleResponse[]).length, totalPages: 1 }
         : data
@@ -78,7 +77,7 @@ export default function AdminGruposPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [token])
+  }, [])
 
   useEffect(() => { load('', 0) }, [load])
 
@@ -107,8 +106,8 @@ export default function AdminGruposPage() {
     setIsLoadingPerms(true)
     try {
       const [perms, assigned] = await Promise.all([
-        getPermissionObjects(token!),
-        role ? getRolePermissions(role.id, token!) : Promise.resolve([]),
+        getPermissionObjects(),
+        role ? getRolePermissions(role.id) : Promise.resolve([]),
       ])
       setAllPermissions(perms)
       setCurrentPermissions(assigned)
@@ -131,14 +130,13 @@ export default function AdminGruposPage() {
   // ── save (create or update) ──────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!token) return
     setIsSaving(true)
     setFormError(null)
     try {
       // 1. Upsert the role
       const saved = selected
-        ? await updateRole(selected.id, { name: name.trim() }, token)
-        : await createRole({ name: name.trim() }, token)
+        ? await updateRole(selected.id, { name: name.trim() })
+        : await createRole({ name: name.trim() })
 
       // 2. Sync permissions
       const prevIds = new Set(currentPermissions.map((rp) => rp.permissionId))
@@ -147,8 +145,8 @@ export default function AdminGruposPage() {
       const toRemove = currentPermissions.filter((rp) => !selectedPermIds.has(rp.permissionId))
 
       await Promise.all([
-        ...toAdd.map((permId) => assignPermission({ roleId: saved.id, permissionId: permId }, token)),
-        ...toRemove.map((rp) => revokePermission(rp.id, token)),
+        ...toAdd.map((permId) => assignPermission({ roleId: saved.id, permissionId: permId })),
+        ...toRemove.map((rp) => revokePermission(rp.id)),
       ])
 
       await load(searchQuery, currentPage)
@@ -162,9 +160,9 @@ export default function AdminGruposPage() {
 
   // ── delete ───────────────────────────────────────────────────────────────
   const handleDelete = async () => {
-    if (!selected || !token) return
+    if (!selected) return
     try {
-      await deleteRole(selected.id, token)
+      await deleteRole(selected.id)
       const newPage = roles.length === 1 && currentPage > 0 ? currentPage - 1 : currentPage
       setCurrentPage(newPage)
       await load(searchQuery, newPage)
@@ -183,7 +181,7 @@ export default function AdminGruposPage() {
     setIsDetailsOpen(true)
     setIsLoadingDetails(true)
     try {
-      const perms = await getRolePermissions(role.id, token!)
+      const perms = await getRolePermissions(role.id)
       setDetailsPermissions(perms)
     } finally {
       setIsLoadingDetails(false)

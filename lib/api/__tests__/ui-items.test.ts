@@ -24,18 +24,18 @@ describe('getUiPermissionObjects', () => {
     vi.clearAllMocks()
   })
 
-  it('calls GET /api/ui-permission-objects with the provided token', async () => {
+  it('calls GET /api/ui-permission-objects', async () => {
     vi.mocked(apiClient.get).mockResolvedValue(mockAssignments)
 
-    await getUiPermissionObjects('my-token')
+    await getUiPermissionObjects()
 
-    expect(apiClient.get).toHaveBeenCalledWith('/api/ui-permission-objects', 'my-token')
+    expect(apiClient.get).toHaveBeenCalledWith('/api/ui-permission-objects')
   })
 
   it('returns the list of UI permission assignments', async () => {
     vi.mocked(apiClient.get).mockResolvedValue(mockAssignments)
 
-    const result = await getUiPermissionObjects('my-token')
+    const result = await getUiPermissionObjects()
 
     expect(result).toEqual(mockAssignments)
   })
@@ -43,6 +43,6 @@ describe('getUiPermissionObjects', () => {
   it('propagates errors from the API client', async () => {
     vi.mocked(apiClient.get).mockRejectedValue(new Error('Network error'))
 
-    await expect(getUiPermissionObjects('my-token')).rejects.toThrow('Network error')
+    await expect(getUiPermissionObjects()).rejects.toThrow('Network error')
   })
 })

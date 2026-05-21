@@ -25,7 +25,6 @@ const mockUser = { id: 1, username: 'admin', email: 'admin@test.com', roleId: 1,
 function makeAuth(overrides: Partial<ReturnType<typeof useAuth>>) {
   return {
     user: null,
-    token: null,
     isLoading: false,
     isAdmin: false,
     login: vi.fn(),

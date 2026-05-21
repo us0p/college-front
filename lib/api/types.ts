@@ -11,7 +11,6 @@ export interface LoginRequest {
 }
 
 export interface LoginResponse {
-  token: string
   userId: number
   username: string
   email: string
@@ -32,10 +31,17 @@ export interface UserResponse {
   ra?: string
 }
 
+export interface UserPageResponse {
+  content: UserResponse[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+}
+
 export interface UserRequest {
   username: string
   email: string
-  password: string
   roleId: number
   ra?: string
   phoneNumber?: string

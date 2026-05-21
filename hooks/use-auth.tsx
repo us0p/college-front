@@ -13,13 +13,10 @@ import { apiClient } from '@/lib/api/client'
 import { getUiPermissionObjects } from '@/lib/api/ui-items'
 import type { LoginResponse, UserResponse, UiPermissionObjectResponse } from '@/lib/api/types'
 
-const USER_KEY        = 'auth_user'
-const PERMISSIONS_KEY = 'auth_permissions'
-const UI_PERM_KEY     = 'auth_ui_permissions'
+const USER_KEY = 'auth_user'
 
 interface AuthContextType {
   user: UserResponse | null
-  token: string | null
   isLoading: boolean
   isAdmin: boolean
   login: (username: string, password: string) => Promise<void>
@@ -42,14 +39,11 @@ function readLocal<T>(key: string): T | null {
 
 function clearStorage() {
   localStorage.removeItem(USER_KEY)
-  localStorage.removeItem(PERMISSIONS_KEY)
-  localStorage.removeItem(UI_PERM_KEY)
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser]                   = useState<UserResponse | null>(null)
-  const [token, setToken]                 = useState<string | null>(null)   // in-memory only
-  const [permissions, setPermissions]     = useState<string[]>([])          // permission names
+  const [permissions, setPermissions]     = useState<string[]>([])
   const [uiPermissions, setUiPermissions] = useState<UiPermissionObjectResponse[]>([])
   const [isLoading, setIsLoading]         = useState(true)
 
@@ -60,16 +54,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(false)
       return
     }
-    // Cookie is sent automatically (credentials: include configured in apiClient)
-    apiClient.get<LoginResponse>('/api/auth/me', undefined)
+    apiClient.get<LoginResponse>('/api/auth/me')
       .then(async (me) => {
-        const uiPerms = await getUiPermissionObjects(me.token)
-        setToken(me.token)
+        const uiPerms = await getUiPermissionObjects()
         setUser(storedUser)
         setPermissions(me.permissions)
         setUiPermissions(uiPerms)
-        localStorage.setItem(PERMISSIONS_KEY, JSON.stringify(me.permissions))
-        localStorage.setItem(UI_PERM_KEY, JSON.stringify(uiPerms))
       })
       .catch(() => {
         clearStorage()
@@ -80,7 +70,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (username: string, password: string): Promise<void> => {
     const result = await apiLogin({ username, password })
 
-    // Build UserResponse from login response — no extra GET /api/users call needed
     const currentUser: UserResponse = {
       id:          result.userId,
       username:    result.username,
@@ -91,25 +80,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       roleName:    result.roleName,
     }
 
-    const uiPerms = await getUiPermissionObjects(result.token)
+    const uiPerms = await getUiPermissionObjects()
 
-    // Token stays in memory only — NOT persisted in localStorage
-    setToken(result.token)
     setUser(currentUser)
     setPermissions(result.permissions)
     setUiPermissions(uiPerms)
 
-    // Persist user info and permissions (but not the token) for session restoration
-    localStorage.setItem(USER_KEY,        JSON.stringify(currentUser))
-    localStorage.setItem(PERMISSIONS_KEY, JSON.stringify(result.permissions))
-    localStorage.setItem(UI_PERM_KEY,     JSON.stringify(uiPerms))
+    // Persist only the user object for session restoration — permissions re-fetched from /me
+    localStorage.setItem(USER_KEY, JSON.stringify(currentUser))
   }, [])
 
   const logout = useCallback(() => {
-    // Clear the httpOnly cookie server-side (fire-and-forget, ignore errors)
-    void apiClient.post('/api/auth/logout', {}, undefined)?.catch?.(() => {})
+    void apiClient.post('/api/auth/logout', {})?.catch?.(() => {})
     clearStorage()
-    setToken(null)
     setUser(null)
     setPermissions([])
     setUiPermissions([])
@@ -130,12 +113,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user, uiPermissions, permissions],
   )
 
-  // isAdmin: user holds the 'admin' permission object
   const isAdmin = permissions.includes('admin')
 
   return (
     <AuthContext.Provider
-      value={{ user, token, isLoading, isAdmin, login, logout, hasPermission, canAccessUiItem }}
+      value={{ user, isLoading, isAdmin, login, logout, hasPermission, canAccessUiItem }}
     >
       {children}
     </AuthContext.Provider>
