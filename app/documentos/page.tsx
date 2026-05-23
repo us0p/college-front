@@ -45,19 +45,18 @@ function formatFileSize(bytes: number): string {
 }
 
 export default function DocumentosPage() {
-  const { accessLevel, user } = useAuth()
+  const { isAdmin, user } = useAuth()
   const [documents, setDocuments] = useState<Document[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     initializeStorage()
-    // Visitante tem nível 1, usuário logado usa seu nível de acesso
-    const level = user ? accessLevel : 1
+    const level = user ? (isAdmin ? 99 : 2) : 1
     const docs = getDocumentsByAccessLevel(level)
     setDocuments(docs)
     setLoading(false)
-  }, [accessLevel, user])
+  }, [isAdmin, user])
 
   const filteredDocuments = documents.filter((doc) =>
     doc.name.toLowerCase().includes(searchQuery.toLowerCase())

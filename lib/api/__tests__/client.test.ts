@@ -71,7 +71,7 @@ describe('createApiClient', () => {
     it('throws ApiError with status 401 on Unauthorized', async () => {
       mockFetch.mockResolvedValue(makeResponse({ message: 'Unauthorized' }, 401))
 
-      const err = await client.get('/api/users').catch((e) => e)
+      const err = await client.get('/api/users').catch((e) => e) as ApiError
 
       expect(err).toBeInstanceOf(ApiError)
       expect(err.status).toBe(401)
@@ -80,7 +80,7 @@ describe('createApiClient', () => {
     it('throws ApiError with status 500 on server error', async () => {
       mockFetch.mockResolvedValue(makeResponse({ message: 'Internal Server Error' }, 500))
 
-      const err = await client.get('/api/users').catch((e) => e)
+      const err = await client.get('/api/users').catch((e) => e) as ApiError
 
       expect(err).toBeInstanceOf(ApiError)
       expect(err.status).toBe(500)
@@ -89,7 +89,7 @@ describe('createApiClient', () => {
     it('uses detail from response body in ApiError', async () => {
       mockFetch.mockResolvedValue(makeResponse({ detail: 'Token expired' }, 401))
 
-      const err = await client.get('/api/users').catch((e) => e)
+      const err = await client.get('/api/users').catch((e) => e) as ApiError
 
       expect(err.message).toBe('Token expired')
     })
@@ -115,7 +115,7 @@ describe('createApiClient', () => {
     it('throws ApiError on 400', async () => {
       mockFetch.mockResolvedValue(makeResponse({ message: 'Validation error' }, 400))
 
-      const err = await client.post('/api/auth/login', {}).catch((e) => e)
+      const err = await client.post('/api/auth/login', {}).catch((e) => e) as ApiError
 
       expect(err).toBeInstanceOf(ApiError)
       expect(err.status).toBe(400)
