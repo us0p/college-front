@@ -5,6 +5,6 @@ docker stop muraluni-frontend
 docker rm muraluni-frontend
 docker run -d \
   --name muraluni-frontend \
-  -p 3000:3001 \
+  -p 3001:3000 \
   --restart unless-stopped \
   personalgym-frontend
