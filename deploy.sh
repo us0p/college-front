@@ -7,4 +7,4 @@ docker run -d \
   --name muraluni-frontend \
   -p 3001:3000 \
   --restart unless-stopped \
-  personalgym-frontend
+  muraluni-frontend
